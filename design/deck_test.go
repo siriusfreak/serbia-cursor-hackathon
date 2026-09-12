@@ -1,6 +1,8 @@
 package design
 
 import (
+	"bytes"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -287,6 +289,53 @@ func TestTheDeckLinksToThisRepository(t *testing.T) {
 
 	if !strings.Contains(deck(t), "github.com/"+remote) {
 		t.Errorf("the slides do not link to github.com/%s", remote)
+	}
+}
+
+// TestTheLineCountIsNotStale keeps the size claim on the application slide
+// honest. It has drifted once already: the deck said 7,600 lines while the
+// repository held 10,145, because a large change landed after the slide was
+// written.
+//
+// The slide states a rounded figure, so this allows any claim within 15% of the
+// real count and never above it. Understating is fine; overstating is not.
+func TestTheLineCountIsNotStale(t *testing.T) {
+	var lines int
+	err := filepath.WalkDir("..", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && (d.Name() == ".git" || d.Name() == "fyne-cross") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		body, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return nil
+		}
+		lines += bytes.Count(body, []byte("\n"))
+		return nil
+	})
+	if err != nil || lines < 1000 {
+		t.Fatalf("counted %d lines of Go (err %v); the walk is not finding the source", lines, err)
+	}
+
+	m := regexp.MustCompile(`([\d,]+) lines of Go`).FindStringSubmatch(deck(t))
+	if m == nil {
+		t.Skip("no slide states a line count")
+	}
+	claimed, convErr := strconv.Atoi(strings.ReplaceAll(m[1], ",", ""))
+	if convErr != nil {
+		t.Fatalf("could not read the claimed line count %q: %v", m[1], convErr)
+	}
+
+	switch {
+	case claimed > lines:
+		t.Errorf("the deck claims %s lines of Go but the repository has %d; never overstate", m[1], lines)
+	case float64(claimed) < float64(lines)*0.85:
+		t.Errorf("the deck claims %s lines of Go but the repository has %d; the slide is stale", m[1], lines)
 	}
 }
 

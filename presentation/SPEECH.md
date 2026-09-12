@@ -142,8 +142,7 @@ Slow down here.
 
 Twenty seconds. Let the audience look at the window.
 
-> "This is real software. Seven and a half thousand lines of Go, and a native
-> desktop window.
+> "This is real software. Ten thousand lines of Go, and a native desktop window.
 >
 > On the left, the analogies. Every row shows its limit. On the right, cognitive
 > debt above mastery, in two separate groups, because they are two different
