@@ -60,26 +60,30 @@ func (s *Shell) Play(steps []Step, speed float64) {
 
 // playStep applies one beat on the UI goroutine.
 func (s *Shell) playStep(step Step) {
-	fyne.Do(func() {
-		s.setBusy(step.Thinking)
-		if step.Learner != "" {
-			s.appendUser(step.Learner)
-		}
-		if step.Tool != "" {
-			s.appendToolCall(step.Tool)
-		}
-		if step.Text != "" {
-			// Reset first: each scripted line is its own block, the way a real
-			// reply is after a tool call.
-			s.streaming.Reset()
-			s.streamAt = -1
-			s.streamText(step.Text)
-		}
-		if step.View != nil {
-			s.AppendView(*step.View)
-		}
-		if len(step.Mastery) > 0 {
-			s.refreshMasteryWith(step.Mastery)
-		}
-	})
+	fyne.Do(func() { s.applyStep(step) })
+}
+
+// applyStep is playStep without the goroutine hop, so a test can drive a whole
+// script through the real feed without a driver to run it.
+func (s *Shell) applyStep(step Step) {
+	s.setBusy(step.Thinking)
+	if step.Learner != "" {
+		s.appendUser(step.Learner)
+	}
+	if step.Tool != "" {
+		s.appendToolCall(step.Tool)
+	}
+	if step.Text != "" {
+		// Reset first: each scripted line is its own block, the way a real
+		// reply is after a tool call.
+		s.streaming.Reset()
+		s.streamAt = -1
+		s.streamText(step.Text)
+	}
+	if step.View != nil {
+		s.AppendView(*step.View)
+	}
+	if len(step.Mastery) > 0 {
+		s.refreshMasteryWith(step.Mastery)
+	}
 }

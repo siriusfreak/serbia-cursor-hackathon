@@ -207,8 +207,13 @@ func renderQuestionCard(v ext.ViewSpec, emit func(ext.ViewEvent)) (fyne.CanvasOb
 			return
 		}
 		spent = true
-		box.Objects = []fyne.CanvasObject{header, prompt}
-		box.Refresh()
+		// Remove rather than reassigning box.Objects. Assigning the slice
+		// leaves the object tree correct while the removed widgets stay drawn,
+		// because their renderers are never torn down -- so the card looks
+		// exactly as live as it did, and every test that walks the tree says
+		// it is fine.
+		box.Remove(control)
+		box.Remove(buttons)
 	}
 
 	send := widget.NewButton("Answer", func() {

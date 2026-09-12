@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/widget"
+
 	"github.com/sirius/cogdebt/internal/ext"
 )
 
@@ -86,4 +90,58 @@ func TestTheDemoDiagramIsEmbedded(t *testing.T) {
 	if _, _, err := decodeImage(raw.([]byte)); err != nil {
 		t.Fatalf("the embedded diagram does not decode: %v", err)
 	}
+}
+
+// TestNoStaleFormsInTheScriptedRun replays every step into a real feed and
+// checks the invariant the eye caught twice: the moment the learner says
+// anything, no question on screen is still a form.
+//
+// A live card below an answered question invites answering it again, and the
+// assessor would record that as a second attempt at something it asked once.
+func TestNoStaleFormsInTheScriptedRun(t *testing.T) {
+	test.NewApp()
+	s := newTestShell()
+
+	for i, step := range HappyPath() {
+		s.applyStep(step)
+
+		open := openCards(s.feed)
+		if open > 1 {
+			t.Fatalf("step %d: %d answerable cards on screen at once", i, open)
+		}
+		if step.Learner != "" && open != 0 {
+			t.Fatalf("step %d: the learner said %q with a question still open as a form",
+				i, truncate(step.Learner, 40))
+		}
+	}
+
+	// Every question asked is still readable at the end: retiring spends the
+	// form, it does not erase the history.
+	if asked := strings.Count(allText(s.feed), "·"); asked == 0 {
+		t.Error("no question headers survive in the feed; the exchange left no record")
+	}
+}
+
+// newTestShell is the smallest shell that can take a step: a feed to draw into
+// and the two widgets setBusy touches.
+func newTestShell() *Shell {
+	feed := container.NewVBox()
+	spinner := widget.NewProgressBarInfinite()
+	spinner.Hide()
+	return &Shell{
+		feed:      feed,
+		scroll:    container.NewVScroll(feed),
+		send:      widget.NewButton("Send", nil),
+		spinner:   spinner,
+		side:      container.NewVBox(),
+		streaming: &strings.Builder{},
+		streamAt:  -1,
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
