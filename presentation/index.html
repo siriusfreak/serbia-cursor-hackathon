@@ -153,6 +153,10 @@ pre .c{color:var(--muted)} pre .kw{color:var(--accent)} pre .st{color:var(--succ
   z-index:5;opacity:0;transition:opacity .3s}
 #help.on{opacity:1}
 aside.notes{display:none}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(232,163,61,.35)}
+a:hover{border-bottom-color:var(--accent)}
+.hl a{color:var(--fg);border-bottom-color:transparent}
+.hl a:hover{color:var(--accent);border-bottom-color:rgba(232,163,61,.45)}
 
 /* ---- print, for a PDF copy -------------------------------------------- */
 @media print{
@@ -188,7 +192,8 @@ aside.notes{display:none}
     </div>
     <div class="tiny" style="text-align:right">
       Cursor Community Serbia Hackathon · Go · plugin ABI · Google ADK<br>
-      <span class="am mono">github.com/siriusfreak/serbia-cursor-hackathon</span>
+      <a class="mono" href="https://github.com/siriusfreak/serbia-cursor-hackathon" target="_blank"
+         rel="noopener">github.com/siriusfreak/serbia-cursor-hackathon</a>
     </div>
   </div>
   <aside class="notes">
@@ -214,20 +219,16 @@ Slide 3 explains the name, and it works better after the audience sees the probl
     </div>
     <div>
       <div class="wall">
-        <div class="hl"><span class="d">Jun 19</span><span class="t">Is AI ruining our skills? Early results are in — and they're not good</span><span class="p">Nature</span></div>
-        <div class="hl"><span class="d">Jun 25</span><span class="t">Ford rehires 350 engineers after AI fails to preserve expertise</span></div>
-        <div class="hl"><span class="d">Aug 13</span><span class="t">Understanding is the new bottleneck</span></div>
-        <div class="hl"><span class="d">Aug 24</span><span class="t">Coding expertise is going to collapse from AI reliance</span></div>
-        <div class="hl"><span class="d">Aug 29</span><span class="t">LLMs are making me lose my savviness</span></div>
-        <div class="hl"><span class="d">Aug 30</span><span class="t">No AI Fridays</span></div>
+        <div class="hl"><span class="d">Jun 19</span><span class="t"><a href="https://news.ycombinator.com/item?id=48601286" target="_blank" rel="noopener">Is AI ruining our skills? Early results are in — and they're not good</a></span><span class="p">Nature</span></div>
+        <div class="hl"><span class="d">Jun 25</span><span class="t"><a href="https://news.ycombinator.com/item?id=48674446" target="_blank" rel="noopener">Ford rehires 350 engineers after AI fails to preserve expertise</a></span></div>
+        <div class="hl"><span class="d">Aug 13</span><span class="t"><a href="https://news.ycombinator.com/item?id=49290299" target="_blank" rel="noopener">Understanding is the new bottleneck</a></span></div>
+        <div class="hl"><span class="d">Aug 24</span><span class="t"><a href="https://news.ycombinator.com/item?id=49421554" target="_blank" rel="noopener">Coding expertise is going to collapse from AI reliance</a></span></div>
+        <div class="hl"><span class="d">Aug 29</span><span class="t"><a href="https://news.ycombinator.com/item?id=49492184" target="_blank" rel="noopener">LLMs are making me lose my savviness</a></span></div>
+        <div class="hl"><span class="d">Aug 30</span><span class="t"><a href="https://news.ycombinator.com/item?id=49498095" target="_blank" rel="noopener">No AI Fridays</a></span></div>
       </div>
     </div>
   </div>
   <div style="height:20px"></div>
-  <div class="tiny">
-    Six of nineteen Hacker News stories about this problem, published between April and August 2026.
-    Every story is listed with its link in <span class="mono am">presentation/SOURCES.md</span>.
-  </div>
   <aside class="notes">
 Do not read the list on the right. Point at two items.
 Nature: the effect is measured now, not only felt. Ford: the problem already has a cost.
@@ -555,9 +556,12 @@ So a new API key in Settings gives the model a new tool on the next message, wit
   <div class="cols" style="align-items:center">
     <div class="wordmark" style="font-size:40px">cogdebt<span class="dot">.</span></div>
     <div class="tiny" style="text-align:right;line-height:1.7">
-      Source code &nbsp;<span class="am mono">github.com/siriusfreak/serbia-cursor-hackathon</span><br>
-      macOS build &nbsp;<span class="am mono">…/releases/tag/v0.1.0</span><br>
-      These slides &nbsp;<span class="am mono">serbia-cursor-hackathon.onrender.com</span>
+      Source code &nbsp;<a class="mono" href="https://github.com/siriusfreak/serbia-cursor-hackathon"
+        target="_blank" rel="noopener">github.com/siriusfreak/serbia-cursor-hackathon</a><br>
+      Downloads &nbsp;<a class="mono" href="https://github.com/siriusfreak/serbia-cursor-hackathon/releases"
+        target="_blank" rel="noopener">github.com/siriusfreak/serbia-cursor-hackathon/releases</a><br>
+      These slides &nbsp;<a class="mono" href="https://serbia-cursor-hackathon.onrender.com"
+        target="_blank" rel="noopener">serbia-cursor-hackathon.onrender.com</a>
       &nbsp;<span class="mu">· MIT</span>
     </div>
   </div>

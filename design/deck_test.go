@@ -198,7 +198,10 @@ func normalise(s string) string {
 func TestEveryHeadlineOnTheSlidesIsCited(t *testing.T) {
 	sources := normalise(readFile(t, sourcesSrc))
 
-	headline := regexp.MustCompile(`<span class="t">([^<]+)</span>`)
+	// The headline may wrap a link to the original thread, so strip any inner
+	// markup before comparing.
+	headline := regexp.MustCompile(`(?s)<span class="t">(.*?)</span>`)
+	tags := regexp.MustCompile(`<[^>]*>`)
 	found := headline.FindAllStringSubmatch(deck(t), -1)
 	if len(found) == 0 {
 		t.Fatal("no headlines found on the slides; the parser is looking for the wrong markup")
@@ -206,18 +209,23 @@ func TestEveryHeadlineOnTheSlidesIsCited(t *testing.T) {
 	for _, m := range found {
 		// Slides truncate a long title to fit the column, so compare on the
 		// opening of the title rather than the whole string.
-		want := normalise(m[1])
+		want := normalise(tags.ReplaceAllString(m[1], ""))
 		if len(want) > 40 {
 			want = want[:40]
 		}
 		if !strings.Contains(sources, want) {
-			t.Errorf("the slide shows %q but %s does not cite it", m[1], sourcesSrc)
+			t.Errorf("the slide shows %q but %s does not cite it", tags.ReplaceAllString(m[1], ""), sourcesSrc)
 		}
 	}
 }
 
-// TestTheEvidenceCountMatchesTheSources pins the number the presenter says out
-// loud to the number of rows anyone can count in the file.
+// TestTheEvidenceCountMatchesTheSources pins a stated count to the number of
+// rows anyone can count in SOURCES.md.
+//
+// The presenter says the number out loud, so SPEECH.md always has to agree with
+// the file. The slide itself may or may not state a count -- showing headlines
+// without a total is a weaker claim, and a weaker claim needs no check -- so the
+// deck is only checked when it makes the claim.
 func TestTheEvidenceCountMatchesTheSources(t *testing.T) {
 	rows := regexp.MustCompile(`(?m)^\| (\d{4}-\d{2}-\d{2}) \|`).FindAllStringSubmatch(readFile(t, sourcesSrc), -1)
 	n := len(rows)
@@ -229,14 +237,10 @@ func TestTheEvidenceCountMatchesTheSources(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s lists %d sources, which has no spelling in numberWords", sourcesSrc, n)
 	}
-	if want := "of " + word + " Hacker News stories"; !strings.Contains(deck(t), want) {
-		t.Errorf("%s lists %d sources, so a slide should say %q", sourcesSrc, n, want)
-	}
-	if !strings.Contains(readFile(t, speechSrc), word) {
-		t.Errorf("the deck claims %s sources but %s says a different number", word, speechSrc)
+	if speech := readFile(t, speechSrc); !strings.Contains(speech, word) {
+		t.Errorf("%s lists %d sources, so %s should say %q out loud", sourcesSrc, n, speechSrc, word)
 	}
 
-	// The date range on the slide has to cover the sources actually listed.
 	first, last := rows[0][1], rows[0][1]
 	for _, r := range rows {
 		if r[1] < first {
@@ -249,9 +253,19 @@ func TestTheEvidenceCountMatchesTheSources(t *testing.T) {
 	months := map[string]string{"01": "January", "02": "February", "03": "March", "04": "April",
 		"05": "May", "06": "June", "07": "July", "08": "August", "09": "September",
 		"10": "October", "11": "November", "12": "December"}
-	want := "between " + months[first[5:7]] + " and " + months[last[5:7]]
-	if !strings.Contains(deck(t), want) {
-		t.Errorf("the sources run from %s to %s, so the slide should say %q", first, last, want)
+	span := months[first[5:7]] + " and " + months[last[5:7]]
+
+	// Only enforce the slide when a slide actually states a number.
+	body := deck(t)
+	if !strings.Contains(body, "Hacker News stories") {
+		return
+	}
+	if want := "of " + word + " Hacker News stories"; !strings.Contains(body, want) {
+		t.Errorf("a slide states a count of Hacker News stories, but %s lists %d, so it should say %q",
+			sourcesSrc, n, want)
+	}
+	if !strings.Contains(body, "between "+span) {
+		t.Errorf("the sources run from %s to %s, so the slide should say %q", first, last, "between "+span)
 	}
 }
 

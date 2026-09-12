@@ -47,3 +47,10 @@ go.work.sum
 /design/*.html
 !/design/*.dc.html
 __pycache__/
+
+# fyne-cross build artifacts: cross-compiled binaries, published as releases.
+/fyne-cross/
+# ...and the metadata shim it generates in the command package and does not
+# always clean up. It embeds a placeholder Fyne logo, so committing it would
+# put that icon into everyone's local build.
+/cmd/cogdebt/fyne_metadata_init.go
