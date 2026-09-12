@@ -35,3 +35,6 @@ go.work.sum
 *.db
 *.db-journal
 *.png
+
+# Built out-of-process plugin binaries
+/plugins/

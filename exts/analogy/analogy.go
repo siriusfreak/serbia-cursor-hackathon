@@ -33,7 +33,10 @@ func New() *Ext {
 			// The parent needs the table intact, and rewriting it costs another
 			// LLM call per delegation.
 			SkipSummarization: true,
-			ToolRefs:          []string{"profile_get"},
+			// The agent that produces the pairs is the one that records them.
+			// Leaving that to the caller means it is skipped whenever the reply
+			// is long, and the table never reaches the screen.
+			ToolRefs: []string{"profile_get", "profile_save_analogy"},
 		},
 	}
 }
@@ -75,7 +78,12 @@ breakdown must never be empty. An analogy without a stated limit does not pay of
 it creates new debt, because the learner keeps the borrowed intuition past the point it holds.
 If you cannot name a way the analogy fails, the pairing is too vague -- replace it.
 
-Return three to five pairs, strongest first. Be concrete: name real mechanisms, not categories.`
+Produce three to five pairs, strongest first. Be concrete: name real mechanisms, not categories.
+
+Then, before you answer, call profile_save_analogy with those pairs. That is what puts the table
+on the learner's screen and stores it; skipping it means your work is never shown. After the call,
+reply with at most two sentences pointing at the pair that matters most -- do not restate the table,
+it is already rendered.`
 
 // Manifest describes the plugin. A declarative kind provides exactly one tool.
 func (e *Ext) Manifest() ext.Manifest {

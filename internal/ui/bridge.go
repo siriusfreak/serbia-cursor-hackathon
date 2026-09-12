@@ -18,6 +18,10 @@ type Handler struct {
 	// OnToolCall reports a plugin tool firing, which is what makes the plugin
 	// layer visible during a demo.
 	OnToolCall func(name string)
+	// OnToolResult carries a plugin's structured answer. The UI draws cards
+	// from this rather than from the model's prose: a tool result has a schema,
+	// prose does not.
+	OnToolResult func(name string, result map[string]any)
 	// OnError reports a failed run.
 	OnError func(error)
 	// OnDone reports the run finishing, successfully or not.
@@ -73,6 +77,13 @@ func (b *Bridge) Send(ctx context.Context, text string, h Handler) {
 					post(func() {
 						if h.OnToolCall != nil {
 							h.OnToolCall(name)
+						}
+					})
+				case part.FunctionResponse != nil:
+					name, result := part.FunctionResponse.Name, part.FunctionResponse.Response
+					post(func() {
+						if h.OnToolResult != nil {
+							h.OnToolResult(name, result)
 						}
 					})
 				}

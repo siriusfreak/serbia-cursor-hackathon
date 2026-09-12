@@ -15,6 +15,7 @@ package profile
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/sirius/cogdebt/internal/domain"
 	"github.com/sirius/cogdebt/internal/ext"
@@ -81,8 +82,74 @@ func (e *Ext) Manifest() ext.Manifest {
 					"required": ["concept", "score"]
 				}`),
 			},
+			{
+				Name: "set_frequency",
+				Description: "Records how often each concept appears in the learner's real work, as a value between " +
+					"0 and 1. Call this with the output of github_scan. Without it cognitive debt cannot be computed, " +
+					"because debt weighs what they lean on against what they hold.",
+				Schema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"concepts": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"name":      {"type": "string"},
+									"frequency": {"type": "number", "description": "0..1"}
+								},
+								"required": ["name", "frequency"]
+							}
+						}
+					},
+					"required": ["concepts"]
+				}`),
+			},
+			{
+				Name: "save_analogy",
+				Description: "Stores the analogy pairs you built for the learner and shows them on screen. Call this " +
+					"once per analogy, immediately after the analogy agent answers. Every pair must say where the " +
+					"analogy breaks.",
+				Schema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"rows": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"source":      {"type": "string", "description": "Concept the learner already holds"},
+									"target":      {"type": "string", "description": "Concept in the new field"},
+									"shared_role": {"type": "string", "description": "Structural role that justifies the pairing"},
+									"carry_over":  {"type": "string", "description": "What their intuition gets right"},
+									"breakdown":   {"type": "string", "description": "Where that intuition will mislead them"}
+								},
+								"required": ["source", "target", "breakdown"]
+							}
+						}
+					},
+					"required": ["rows"]
+				}`),
+			},
 		},
 	}
+}
+
+type freqArgs struct {
+	Concepts []struct {
+		Name      string  `json:"name"`
+		Frequency float64 `json:"frequency"`
+	} `json:"concepts"`
+}
+
+type analogyArgs struct {
+	Rows []struct {
+		Source     string `json:"source"`
+		Target     string `json:"target"`
+		SharedRole string `json:"shared_role"`
+		CarryOver  string `json:"carry_over"`
+		Breakdown  string `json:"breakdown"`
+	} `json:"rows"`
 }
 
 type upsertArgs struct {
@@ -106,8 +173,12 @@ func (e *Ext) Invoke(ctx context.Context, tool string, in json.RawMessage) (json
 		return e.upsert(ctx, in)
 	case "mastery_update":
 		return e.masteryUpdate(ctx, in)
+	case "set_frequency":
+		return e.setFrequency(ctx, in)
+	case "save_analogy":
+		return e.saveAnalogy(ctx, in)
 	default:
-		return nil, ext.Invalidf("profile has no tool %q; it provides get, upsert and mastery_update", tool)
+		return nil, ext.Invalidf("profile has no tool %q; it provides get, upsert, mastery_update, set_frequency and save_analogy", tool)
 	}
 }
 
@@ -195,6 +266,89 @@ func (e *Ext) masteryUpdate(ctx context.Context, in json.RawMessage) (json.RawMe
 		"mastery":    level,
 		"next_level": domain.NextLevel(domain.Mastery{Level: level}).String(),
 	})
+}
+
+// setFrequency records how much of the learner's real work touches each
+// concept. Concepts it has never seen are created, because the point is to
+// surface what they lean on but never named as a skill.
+func (e *Ext) setFrequency(ctx context.Context, in json.RawMessage) (json.RawMessage, error) {
+	var a freqArgs
+	if err := ext.Args(in, &a); err != nil {
+		return nil, err
+	}
+	if len(a.Concepts) == 0 {
+		return nil, ext.Invalidf("concepts is empty; pass the output of github_scan")
+	}
+
+	fresh := make([]domain.Concept, 0, len(a.Concepts))
+	for _, c := range a.Concepts {
+		if id := domain.SlugID(c.Name); id != "" {
+			fresh = append(fresh, domain.Concept{ID: id, Name: c.Name})
+		}
+	}
+	if _, _, err := e.db.UpsertConcepts(ctx, e.userID, fresh); err != nil {
+		return nil, ext.Internalf("record concepts: %v", err)
+	}
+
+	updated := 0
+	for _, c := range a.Concepts {
+		id := domain.SlugID(c.Name)
+		if id == "" {
+			continue
+		}
+		if c.Frequency < 0 || c.Frequency > 1 {
+			return nil, ext.Invalidf("frequency for %q is %v; it must be between 0 and 1", c.Name, c.Frequency)
+		}
+		if err := e.db.SetFrequency(ctx, e.userID, id, c.Frequency); err != nil {
+			return nil, ext.Internalf("set frequency for %q: %v", c.Name, err)
+		}
+		updated++
+	}
+	return ext.JSON(map[string]any{"updated": updated})
+}
+
+// saveAnalogy persists the pairs and hands them back in the shape the UI
+// renders, so the table on screen comes from structured data rather than from
+// parsing the model's prose.
+func (e *Ext) saveAnalogy(ctx context.Context, in json.RawMessage) (json.RawMessage, error) {
+	var a analogyArgs
+	if err := ext.Args(in, &a); err != nil {
+		return nil, err
+	}
+	if len(a.Rows) == 0 {
+		return nil, ext.Invalidf("rows is empty; pass the analogy pairs you built")
+	}
+
+	rows := make([]ext.AnalogyRow, 0, len(a.Rows))
+	for _, r := range a.Rows {
+		m := domain.Mapping{
+			Source:     domain.Concept{ID: domain.SlugID(r.Source), Name: r.Source},
+			Target:     domain.Concept{ID: domain.SlugID(r.Target), Name: r.Target},
+			SharedRole: domain.Role(r.SharedRole),
+			Breakdown:  splitNonEmpty(r.Breakdown),
+			CarryOver:  splitNonEmpty(r.CarryOver),
+		}
+		// The domain refuses a mapping with no stated limit; surface that as
+		// something the model can fix rather than silently storing a half pair.
+		if !m.Valid() {
+			return nil, ext.Invalidf("the pair %q -> %q has no breakdown; an analogy without a stated limit creates cognitive debt instead of paying it off", r.Source, r.Target)
+		}
+		if err := e.db.SaveMapping(ctx, e.userID, m); err != nil {
+			return nil, ext.Internalf("save analogy: %v", err)
+		}
+		rows = append(rows, ext.AnalogyRow{
+			Source: r.Source, Target: r.Target, SharedRole: r.SharedRole,
+			CarryOver: r.CarryOver, Breakdown: r.Breakdown,
+		})
+	}
+	return ext.JSON(map[string]any{"saved": len(rows), "rows": rows})
+}
+
+func splitNonEmpty(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return []string{s}
 }
 
 // Close releases nothing: the store is owned by the host, and closing a

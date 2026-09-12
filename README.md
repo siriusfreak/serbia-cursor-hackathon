@@ -1,90 +1,119 @@
 # cogdebt
 
-Учит новой области через ту, которой ты уже владеешь: строит аналогию по структурным ролям, **явно помечает, где она ломается**, и ведёт по лестнице вопросов от переноса к самостоятельности.
+Teaches you a new field through one you already hold: it builds the analogy from
+structural roles, **marks explicitly where that analogy breaks**, and walks you up
+a ladder of questions from borrowed intuition to standing on your own.
 
-Плагинная архитектура на Go, десктоп на Fyne, агенты на Google ADK.
+Plugin architecture in Go, desktop shell in Fyne, agents on Google ADK.
 
-## Запуск
+## Running it
 
 ```bash
-echo 'XAI_API_KEY=<ключ>' > .env   # .env в .gitignore
+echo 'XAI_API_KEY=<key>' > .env   # .env is gitignored
 go run ./cmd/cogdebt
 ```
 
-| Флаг | Что делает |
+| Flag | What it does |
 |---|---|
-| `-cli` | терминальный REPL вместо окна — видно каждый вызов тула |
-| `-screenshot out.png` | наполняет окно примером, снимает PNG и выходит |
-| `-naive` | грузит вторую стратегию аналогий рядом с основной |
-| `-debug` | лог загрузки плагинов и вызовов |
+| `-cli` | terminal REPL instead of the window — every tool call is printed |
+| `-screenshot out.png` | fills the window with sample content, saves a PNG, exits |
+| `-naive` | loads a second analogy strategy alongside the real one |
+| `-plugins DIR` | directory scanned for out-of-process plugin binaries (default `plugins`) |
+| `-debug` | logs plugin loading and tool calls |
 
-Нужен Go 1.27+ (`GOTOOLCHAIN=auto` подтянет сам) и Xcode CLT для cgo — его требует только Fyne.
+Needs Go 1.27+ (`GOTOOLCHAIN=auto` fetches it) and Xcode CLT for cgo — only the
+Fyne binary requires it.
 
-## Идея
+## The idea
 
-**Когнитивный долг** — это не метафора, а величина:
-
-```
-debt(c) = частота_в_реальной_работе(c) × prereq_depth(c) × (1 − mastery(c))
-```
-
-То, на что ты опираешься часто, на чём стоит многое, и чем ты не владеешь.
-
-**Аналогии строятся по структурным ролям, а не по именам.** Не «и там и там есть контроллер», а «и то и другое — единственный источник истины, с которым все остальные сверяются». Отсюда `etcd ↔ feature store`, `liveness probe ↔ drift detection`.
-
-**Поле `breakdown` обязательно.** Аналогия без указанного предела не гасит когнитивный долг, а создаёт новый: человек уносит одолженную интуицию за границу, где она перестаёт работать. Это единственное инвариантное требование доменного слоя.
-
-## Архитектура
+**Cognitive debt** is a quantity, not a metaphor:
 
 ```
-Fyne (окно, ViewSpec-рендер, мост fyne.Do)
+debt(c) = frequency_in_real_work(c) × prereq_depth(c) × (1 − mastery(c))
+```
+
+What you lean on often, that much else rests on, and that you do not hold.
+
+**Analogies are matched on structural role, not on names.** Not "both have a
+controller", but "both are the single source of truth everything else reconciles
+against". That is what produces `etcd ↔ feature store` and
+`liveness probe ↔ drift detection`.
+
+**The `breakdown` field is mandatory.** An analogy with no stated limit does not
+pay off cognitive debt — it creates more, because the learner carries the
+borrowed intuition past the point where it holds. This is the one invariant the
+domain layer enforces.
+
+## Architecture
+
+```
+Fyne (window, ViewSpec renderer, fyne.Do bridge)
         ↓
-ADK (Runner + агенты: profiler, analogy, tutor, assessor)
+ADK (Runner + agents: profiler, analogy, tutor, assessor)
         ↓
-ext.Registry реализует tool.Toolset     ← единственный шов
+ext.Registry implements tool.Toolset     ← the only seam
         ↓
-транспорты: in-process · go-plugin gRPC · WASM
+transports: in-process · go-plugin gRPC · WASM
         ↓
-domain/ — чистое ядро, не импортирует ни ADK, ни Fyne, ни ext
+domain/ — pure core, imports no ADK, no Fyne, no ext
 ```
 
-Весь контракт плагинов — один файл: [`internal/ext/abi.go`](internal/ext/abi.go). Три метода, всё сериализуемо.
+The entire plugin contract is one file: [`internal/ext/abi.go`](internal/ext/abi.go).
+Three methods, everything serializable.
 
-Ключевая деталь: `ext.Registry` реализует `tool.Toolset`, а ADK спрашивает список тулов **на каждом ходу**. Поэтому плагины появляются и исчезают без перезапуска, а корневой агент вообще не знает, что плагины существуют.
+The load-bearing detail: `ext.Registry` implements `tool.Toolset`, and ADK asks
+for the tool list **on every turn**. So plugins appear and disappear with no
+restart, and the root agent never learns that plugins exist at all.
 
-## Структура
+## Layout
 
 ```
-cmd/cogdebt/      точка входа и сборка
-internal/ext/     ABI, реестр, адаптер в ADK, ViewSpec
-internal/domain/  концепты, mastery, аналогии, долг — без внешних зависимостей
-internal/store/   SQLite (modernc, без cgo) + namespaced KV для плагинов
-internal/ui/      тема, компоненты, рендерер, мост к раннеру
-exts/             плагины: profile (данные), analogy (агент)
+cmd/cogdebt/      entry point and wiring
+internal/ext/     ABI, registry, ADK adapter, ViewSpec
+internal/domain/  concepts, mastery, analogies, debt — no external deps
+internal/store/   SQLite (modernc, cgo-free) + namespaced KV for plugins
+internal/ui/      theme, components, renderer, bridge to the runner
+exts/             plugins: profile, assessor, analogy (agent), github (retrieval)
+cmd/ext-github/   the same github plugin, as a standalone process
 docs/             PLUGIN_GUIDE.md
 ```
 
-## Добавить плагин
+## Running a plugin in its own process
 
-См. [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md) — пять минут, ядро трогать не нужно.
+```bash
+go build -o plugins/ext-github ./cmd/ext-github
+go run ./cmd/cogdebt -cli            # github now reports "subprocess"
+rm plugins/ext-github
+go run ./cmd/cogdebt -cli            # falls back to "in-process"
+```
 
-Проверить свой плагин:
+The plugin source is identical in both cases. Because `Extension` moves only
+bytes, the transport is a deployment decision, not a code change — the banner
+prints which one each plugin is using.
+
+## Adding a plugin
+
+See [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md) — five minutes, and you never
+touch the core.
+
+Check your plugin:
 
 ```bash
 go test ./exts/...
 ```
 
-`exttest.Conformance` прогоняет ровно то, что хост проверит при загрузке.
+`exttest.Conformance` runs exactly what the host runs at load time.
 
-## Состояние
+## Status
 
 | | | |
 |---|---|---|
-| Ф0 | скелет, Grok через OpenAI-совместимый эндпоинт | ✅ |
-| Ф1 | ABI, реестр, адаптер, плагины `profile` и `analogy` | ✅ |
-| Ф2a | Fyne-окно, тема, мост, ViewSpec-рендер | ✅ |
-| Ф2b | лестница L1–L4, structured output вместо текста | ⬜ |
-| Ф3 | вынос плагина в отдельный процесс (hashicorp/go-plugin) | ⬜ |
-| Ф4 | GitHub-сканер → частота → когнитивный долг | ⬜ |
+| 0 | skeleton, Grok over an OpenAI-compatible endpoint | ✅ |
+| 1 | ABI, registry, adapter, `profile` and `analogy` plugins | ✅ |
+| 2a | Fyne window, theme, bridge, ViewSpec renderer | ✅ |
+| 2b | L1–L4 ladder on structured output instead of prose | ✅ |
+| 3 | plugin in its own process (hashicorp/go-plugin) | ✅ |
+| 4 | GitHub scanner → frequency → live cognitive debt | ✅ |
 
-Модель по умолчанию `grok-4.6`; сменить — `COGDEBT_MODEL`. Любой OpenAI-совместимый эндпоинт работает через `XAI_BASE_URL`.
+Default model is `grok-4.6`; override with `COGDEBT_MODEL`. Any
+OpenAI-compatible endpoint works through `XAI_BASE_URL`.

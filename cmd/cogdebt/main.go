@@ -27,9 +27,12 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/sirius/cogdebt/exts/analogy"
+	"github.com/sirius/cogdebt/exts/assessor"
+	"github.com/sirius/cogdebt/exts/github"
 	"github.com/sirius/cogdebt/exts/profile"
 	"github.com/sirius/cogdebt/internal/domain"
 	"github.com/sirius/cogdebt/internal/ext"
+	"github.com/sirius/cogdebt/internal/ext/subprocess"
 	"github.com/sirius/cogdebt/internal/store"
 	"github.com/sirius/cogdebt/internal/ui"
 )
@@ -38,31 +41,44 @@ const rootInstruction = `You help an engineer learn a new field by building on w
 
 Always reply in the language the learner writes in.
 
-Your loop:
-1. If you do not know what they know, ask -- then call profile_upsert to save it.
-2. Once their skills are saved and they have named a target topic, delegate to the analogy agent
-   immediately. Do NOT call profile_get first: the analogy agent reads the profile itself, and
-   calling it in the same turn as profile_upsert races the write and returns an empty profile.
-3. Present what comes back as a table: what maps to what, what carries over, and WHERE IT BREAKS.
-   Never drop the breakdown column; it is the part that stops a borrowed intuition from
-   hardening into a wrong one.
-4. Then ask questions that climb: L1 what maps to what, L2 where the analogy fails,
-   L3 the target domain on its own terms, L4 combine several ideas.
-   After grading each answer, call profile_mastery_update.
+The loop:
 
-Never narrate your own mechanics: do not translate the learner's message back to them, do not
-announce which tool you are about to call, do not explain what a tool returned. Show the result.
+1. SKILLS. If you do not know what they know, ask -- then call profile_upsert.
+   If they give you a GitHub username, call github_scan and pass its concepts
+   straight to profile_set_frequency. That is what makes cognitive debt real
+   rather than guessed: it measures what they lean on, which self-report misses.
+
+2. ANALOGY. Once skills are saved and they have named a target topic, delegate to
+   the analogy agent immediately. Do NOT call profile_get first -- the analogy agent
+   reads the profile itself, and calling it in the same turn as profile_upsert races
+   the write and returns an empty profile.
+   The analogy agent records and renders its own pairs; do not repeat them as text.
+
+3. LADDER. Call assessor_next to learn which concept to probe and at which rung.
+   Never choose the topic or the difficulty yourself. Write the question in the
+   learner's language and put it on screen with assessor_ask.
+
+4. GRADE. When they answer, call assessor_grade with a score from 0 to 1, then go
+   back to step 3.
+
+The screen already draws the analogy table and the question card from the tool
+results. Do not repeat their contents as text -- add only what they do not show.
+
+Never narrate your own mechanics: do not translate the learner's message back to
+them, do not announce which tool you are about to call, do not explain what a tool
+returned.
 
 Ask one question at a time. Be concrete and brief.`
 
 func main() {
 	var (
-		dbPath = flag.String("db", "cogdebt.db", "SQLite database path")
-		user   = flag.String("user", "local", "learner id")
-		naive  = flag.Bool("naive", false, "also load the naive analogy plugin, for comparison")
-		cli    = flag.Bool("cli", false, "terminal REPL instead of the desktop window")
-		shot   = flag.String("screenshot", "", "fill the window with sample content, save a PNG here and exit")
-		debug  = flag.Bool("debug", false, "log plugin loading and tool calls")
+		dbPath  = flag.String("db", "cogdebt.db", "SQLite database path")
+		plugDir = flag.String("plugins", "plugins", "directory scanned for out-of-process plugin binaries")
+		user    = flag.String("user", "local", "learner id")
+		naive   = flag.Bool("naive", false, "also load the naive analogy plugin, for comparison")
+		cli     = flag.Bool("cli", false, "terminal REPL instead of the desktop window")
+		shot    = flag.String("screenshot", "", "fill the window with sample content, save a PNG here and exit")
+		debug   = flag.Bool("debug", false, "log plugin loading and tool calls")
 	)
 	flag.Parse()
 
@@ -72,13 +88,13 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 
-	if err := run(*dbPath, *user, *naive, *cli, *shot, log); err != nil {
+	if err := run(*dbPath, *plugDir, *user, *naive, *cli, *shot, log); err != nil {
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dbPath, userID string, naive, cli bool, shot string, log *slog.Logger) error {
+func run(dbPath, pluginDir, userID string, naive, cli bool, shot string, log *slog.Logger) error {
 	loadDotEnv(".env")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -97,12 +113,25 @@ func run(dbPath, userID string, naive, cli bool, shot string, log *slog.Logger) 
 
 	// Every capability enters the system here and nowhere else.
 	reg := ext.NewRegistry(log)
+	transport := map[string]string{}
 	defer reg.Close()
+
+	// Out-of-process plugins are discovered first and win over their built-in
+	// twins, so dropping a binary into ./plugins swaps the transport with no
+	// code change and no restart of anything else.
+	out := subprocess.LoadDir(reg, pluginDir, log)
+	for _, name := range out {
+		transport[name] = "subprocess"
+	}
 
 	reg.MustLoad(
 		profile.New(db, userID),
+		assessor.New(db, userID),
 		analogy.New(),
 	)
+	if !reg.Has("github") {
+		reg.MustLoad(github.New())
+	}
 	if naive {
 		reg.MustLoad(analogy.NewNaive())
 	}
@@ -134,7 +163,7 @@ func run(dbPath, userID string, naive, cli bool, shot string, log *slog.Logger) 
 	bridge := &ui.Bridge{Runner: r, UserID: userID, SessionID: "main"}
 
 	if cli {
-		printBanner(reg, toolset)
+		printBanner(reg, toolset, transport)
 		return repl(ctx, r, userID)
 	}
 
@@ -204,7 +233,7 @@ func buildModel(ctx context.Context) (model.LLM, error) {
 	return llm, nil
 }
 
-func printBanner(reg *ext.Registry, ts *ext.Toolset) {
+func printBanner(reg *ext.Registry, ts *ext.Toolset, transport map[string]string) {
 	fmt.Println("cogdebt — learn by analogy")
 	fmt.Println()
 	for _, m := range reg.Manifests() {
@@ -212,7 +241,11 @@ func printBanner(reg *ext.Registry, ts *ext.Toolset) {
 		for _, p := range m.Provides {
 			names = append(names, ext.QualifiedName(m.Name, p.Name))
 		}
-		fmt.Printf("  plugin %-14s %-9s %s\n", m.Name, m.Kind, strings.Join(names, " "))
+		where := transport[m.Name]
+		if where == "" {
+			where = "in-process"
+		}
+		fmt.Printf("  plugin %-10s %-9s %-12s %s\n", m.Name, m.Kind, where, strings.Join(names, " "))
 	}
 	if tools, err := ts.Tools(nil); err == nil {
 		names := make([]string, 0, len(tools))

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"image/color"
 	"strings"
 
@@ -163,10 +164,11 @@ func (s *Shell) submit() {
 	s.streamAt = -1
 
 	s.cfg.Bridge.Send(s.ctx, text, Handler{
-		OnText:     s.streamText,
-		OnToolCall: s.appendToolCall,
-		OnError:    s.appendError,
-		OnDone:     s.finishTurn,
+		OnText:       s.streamText,
+		OnToolCall:   s.appendToolCall,
+		OnToolResult: s.appendToolResult,
+		OnError:      s.appendError,
+		OnDone:       s.finishTurn,
 	})
 }
 
@@ -207,6 +209,40 @@ func (s *Shell) appendError(err error) {
 		styledText(err.Error(), theme.ColorNameError, theme.SizeNameText, fyne.TextStyle{}))
 	s.feed.Add(container.NewPadded(card))
 	s.bump()
+}
+
+// appendToolResult turns a known plugin result into a card.
+//
+// Only results whose shape the host understands are drawn; anything else is
+// left to the model to narrate. This is how the ladder and the analogy table
+// reach the screen as structured data instead of parsed prose.
+func (s *Shell) appendToolResult(name string, result map[string]any) {
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return
+	}
+	switch {
+	case strings.HasSuffix(name, "assessor_ask"), name == "assessor_ask":
+		var q ext.QuestionProps
+		var id struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(raw, &q) != nil || q.Prompt == "" {
+			return
+		}
+		_ = json.Unmarshal(raw, &id)
+		s.AppendView(ext.View(ext.ViewQuestion, id.ID, q))
+
+	case strings.HasSuffix(name, "profile_save_analogy"):
+		var table ext.AnalogyTableProps
+		if json.Unmarshal(raw, &table) != nil || len(table.Rows) == 0 {
+			return
+		}
+		s.AppendView(ext.View(ext.ViewAnalogyTable, "", table))
+	}
+	// A card starts a fresh text block beneath it.
+	s.streaming.Reset()
+	s.streamAt = -1
 }
 
 // AppendView renders a ViewSpec from a UI plugin into the feed.

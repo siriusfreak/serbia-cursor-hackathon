@@ -6,8 +6,8 @@ Instructions for AI agents working in this repository.
 hold, and marking where that map breaks. Go, plugin ABI, Fyne desktop, agents on
 Google ADK, embedded SQLite.
 
-Audience split, keep it: **code comments in English**, **`README.md` and
-`docs/` in Russian**, this file in English.
+Everything in this repository is written in English: code, comments, `README.md`,
+`docs/` and this file. Keep it that way.
 
 ## Commands
 
@@ -67,6 +67,13 @@ window when you can capture it yourself.
   delegation. Set `SkipSummarization: true` for deterministic agents.
 - **SQLite runs with `SetMaxOpenConns(1)`** on purpose — concurrent tool calls
   otherwise hit "database is locked". Do not raise it.
+- **`net/rpc` silently refuses methods with unexported argument types.** The
+  service still registers and answers calls that use builtin types, so a plugin
+  loads, reports its manifest, and fails on every real invocation. This is why
+  `subprocess.InvokeArgs` and `InvokeReply` are exported. A smoke test will not
+  catch it; `internal/ext/subprocess` has tests that do.
+- **Rebuild plugin binaries after changing wire types.** A stale binary in
+  `plugins/` speaks the old protocol.
 - **`go mod tidy` on a cold cache takes many minutes.** `GOFLAGS=-mod=mod go
   build ./...` resolves only what is imported and is far faster while iterating.
 
@@ -83,8 +90,11 @@ internal/store/   SQLite (modernc, cgo-free) + per-plugin namespaced KV
 internal/ui/      theme.go, components.go (visual vocabulary), render.go
                   (ViewSpec -> Fyne), bridge.go (the one fyne.Do seam),
                   shell.go, demo.go (seeding + screenshot)
-exts/             plugins: profile (data), analogy (declarative agent)
-docs/             PLUGIN_GUIDE.md — written for the teammate, in Russian
+internal/ext/subprocess/  out-of-process transport (go-plugin over net/rpc)
+exts/             plugins: profile and assessor (host state, in-process),
+                  analogy (declarative agent), github (portable, HTTP only)
+cmd/ext-github/   github as a standalone plugin process
+docs/             PLUGIN_GUIDE.md — written for plugin authors
 ```
 
 ## Making changes
@@ -107,8 +117,17 @@ docs/             PLUGIN_GUIDE.md — written for the teammate, in Russian
 
 ## Status
 
-Phases 0, 1 and 2a are done. Not yet built: the L1–L4 ladder on structured
-output (2b), out-of-process plugins via hashicorp/go-plugin (3), and the GitHub
-scanner that populates `Mastery.Frequency` (4). Until 4 lands, `domain.Debt`
-computes against `frequency = 0`, so the sidebar's debt figures are real only
-for the seeded demo data.
+All planned phases are in: plugin ABI and registry, the ADK adapter, the Fyne
+shell, the L1-L4 ladder on structured tool results, out-of-process plugins, and
+the GitHub scanner that makes cognitive debt real rather than guessed.
+
+Two things about the ladder worth knowing before changing it:
+
+- **The UI draws cards from tool results, not from prose.** `ui.Bridge` surfaces
+  `FunctionResponse` parts, and `Shell.appendToolResult` maps the ones it knows
+  (`assessor_ask`, `profile_save_analogy`) onto ViewSpecs. Adding a new card
+  means adding a case there, not asking the model to emit JSON in its text.
+- **The producer records.** The analogy agent calls `profile_save_analogy`
+  itself rather than leaving it to its caller. A caller asked to record someone
+  else's output skips it whenever the reply is long, and the table never reaches
+  the screen.

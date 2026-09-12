@@ -124,6 +124,13 @@ func (r *Registry) ByKind(k Kind) []Extension {
 	return out
 }
 
+// Has reports whether a plugin with this name is loaded. The host uses it to
+// prefer an out-of-process plugin over its built-in twin.
+func (r *Registry) Has(name string) bool {
+	_, ok := r.Lookup(name)
+	return ok
+}
+
 // Lookup finds a plugin by name.
 func (r *Registry) Lookup(name string) (Extension, bool) {
 	r.mu.RLock()

@@ -14,32 +14,32 @@ import (
 // Seed fills the feed with representative content. It drives design review and
 // demo screenshots without spending a model call.
 func (s *Shell) Seed() {
-	s.appendUser("Я знаю Kubernetes, Go и распределённые системы. Хочу изучить ML-пайплайны.")
+	s.appendUser("I know Kubernetes, Go and distributed systems. I want to learn ML pipelines.")
 	s.appendToolCall("profile_upsert")
-	s.streamText("Сохранил твой профиль. Разбираю ML-инфраструктуру через то, что ты уже держишь в голове.")
+	s.streamText("Saved your profile. Mapping ML infrastructure onto what you already hold.")
 	s.appendToolCall("analogy")
 
 	s.AppendView(ext.View(ext.ViewAnalogyTable, "", ext.AnalogyTableProps{Rows: []ext.AnalogyRow{
 		{
 			Source: "etcd", Target: "feature store", SharedRole: "source_of_truth",
-			CarryOver: "Двойная запись — это split-brain. Кеши и «пересчитаем в скрипте» истиной не являются.",
-			Breakdown: "etcd мал и строго консистентен. Feature store — материализованная витрина над грязными событиями, с раздельным офлайн- и онлайн-путём. Point-in-time корректности у etcd никогда не было.",
+			CarryOver: "Dual writes are split-brain. Caches and \"we'll recompute it in the script\" are not truth.",
+			Breakdown: "etcd is small and strongly consistent. A feature store is a materialized view over dirty events, split into an offline and an online path. Point-in-time correctness is an invariant etcd never had.",
 		},
 		{
-			Source: "rolling update", Target: "promotion в model registry", SharedRole: "rollback",
-			CarryOver: "Никогда не перезаписывай :latest. Пинуй по digest, держи прошлое поколение тёплым.",
-			Breakdown: "Откат Deployment возвращает детерминированный бинарь. Откат модели НЕ возвращает распределение данных, на котором она обучалась — v[n-1] может быть так же неправа.",
+			Source: "rolling update", Target: "promotion in the model registry", SharedRole: "rollback",
+			CarryOver: "Never overwrite :latest. Pin by digest, keep the previous generation warm.",
+			Breakdown: "Rolling back a Deployment restores a deterministic binary. Rolling back a model does NOT restore the data distribution it was trained on — v[n-1] can be just as wrong.",
 		},
 		{
 			Source: "liveness probe", Target: "drift detection", SharedRole: "degradation_signal",
-			CarryOver: "«Процесс жив» — метрика тщеславия. Нужен сигнал, который потребляет контур управления.",
-			Breakdown: "Проба дешёвая, бинарная и мгновенная. Метки приходят поздно, неполно и смещённо — дрейф выглядит здоровым, пока бизнес-метрика умирает.",
+			CarryOver: "\"Process is up\" is a vanity metric. You need a signal the control loop can consume.",
+			Breakdown: "A probe is cheap, binary and contemporaneous. Labels arrive late, incomplete and biased — drift can look healthy while the business metric dies.",
 		},
 	}}))
 
 	s.AppendView(ext.View(ext.ViewQuestion, "q1", ext.QuestionProps{
 		Level:  "L2",
-		Prompt: "Ты сказал, что model registry — это etcd для моделей. Где эта аналогия перестаёт работать?",
+		Prompt: "You said a model registry is etcd for models. Where does that analogy stop working?",
 	}))
 
 	// A preview reads better from the top; live use stays pinned to the newest.
