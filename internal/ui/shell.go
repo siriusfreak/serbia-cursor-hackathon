@@ -37,6 +37,8 @@ type Config struct {
 	// Plugins is the loaded plugin summary, listed in the sidebar so the
 	// plugin layer is visible without opening a terminal.
 	Plugins []string
+	// Settings wires the configuration dialog. Zero value hides the button.
+	Settings SettingsConfig
 }
 
 // Shell is the desktop window.
@@ -96,10 +98,11 @@ func (s *Shell) header() fyne.CanvasObject {
 	title := styledText("cogdebt", theme.ColorNameForeground, theme.SizeNameSubHeadingText, fyne.TextStyle{Bold: true})
 	subtitle := muted("learn a new field through the one you already hold")
 
-	var right fyne.CanvasObject = layoutBlank()
+	var badge fyne.CanvasObject = layoutBlank()
 	if s.cfg.Model != "" {
-		right = chip(s.cfg.Model, s.pal.accent, s.pal.surfaceHi)
+		badge = chip(s.cfg.Model, s.pal.accent, s.pal.surfaceHi)
 	}
+	right := container.NewHBox(badge, s.settingsButton())
 
 	bar := container.NewBorder(nil, nil, container.NewVBox(title, subtitle), right)
 	line := canvas.NewRectangle(s.pal.line)
@@ -130,6 +133,13 @@ func (s *Shell) sidebar() fyne.CanvasObject {
 	// No heading here: refreshMastery emits its own group labels, and a
 	// "PROGRESS" above "COGNITIVE DEBT" reads as a category error.
 	blocks := container.NewVBox(s.side)
+	if s.cfg.Settings.Fields != nil {
+		if note := missingKeysNote(s.cfg.Settings.Fields()); note != "" {
+			blocks.Add(widget.NewSeparator())
+			blocks.Add(sectionLabel("UNCONFIGURED"))
+			blocks.Add(muted(note))
+		}
+	}
 	if len(s.cfg.Plugins) > 0 {
 		rows := make([]fyne.CanvasObject, 0, len(s.cfg.Plugins))
 		for _, p := range s.cfg.Plugins {

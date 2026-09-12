@@ -200,6 +200,18 @@ func NewToolset(cfg ToolsetConfig) *Toolset {
 // Name implements tool.Toolset.
 func (ts *Toolset) Name() string { return "plugins" }
 
+// Invalidate drops the built agent tools and model clients. Call it after the
+// registry is reloaded: a rebuilt plugin can carry the same version as the one
+// it replaced, so the version-keyed cache would otherwise keep serving the old
+// instance and any model it was holding.
+func (ts *Toolset) Invalidate() {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.agents = map[string]tool.Tool{}
+	ts.built = map[string]string{}
+	ts.models = map[string]model.LLM{}
+}
+
 // Tools implements tool.Toolset, returning one ADK tool per plugin tool plus
 // one tool per agent plugin.
 func (ts *Toolset) Tools(ctx agent.ReadonlyContext) ([]tool.Tool, error) {

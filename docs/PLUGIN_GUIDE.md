@@ -241,6 +241,35 @@ Two things to know:
 - **Rebuild the binary whenever the ABI changes.** A stale binary speaks the old
   protocol and will fail at call time.
 
+## Plugins that need a key
+
+Add a `Configured() bool` method and the host will skip loading you when the key
+is missing, instead of exposing a tool the model will keep failing:
+
+```go
+func (e *Ext) Configured() bool { return e.token != "" }
+```
+
+Register the key in `settingsConfig` in `cmd/cogdebt/main.go` so it appears in
+the Settings dialog with a line saying what it turns on. Saving reloads the
+registry, so your plugin goes live on the next message with no restart.
+
+## Testing against the real service
+
+Stub tests prove your parsing. They cannot prove you can reach the service at
+all — the Daytona plugin passed a full stub suite while being unable to
+authenticate. Add a `live_test.go` guarded so it never runs by accident:
+
+```go
+if os.Getenv("COGDEBT_LIVE") == "" || os.Getenv(EnvKey) == "" {
+	t.Skip("set COGDEBT_LIVE=1 and " + EnvKey + " to run against the real service")
+}
+```
+
+```bash
+COGDEBT_LIVE=1 go test ./exts/yours/ -run Live -v
+```
+
 ## Schemas: one trap
 
 `Schema` must be `{"type":"object", ...}` or the plugin is rejected at load. Inside

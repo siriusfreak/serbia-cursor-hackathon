@@ -154,6 +154,53 @@ Changing a theme colour and forgetting the mockups is now a test failure, which
 is the point. To re-assemble after editing artboards, re-run the `/design`
 skill's seeder over `design/*.dc.html` and republish.
 
+## Keys, and plugins that are off without them
+
+Settings (the header button) writes `.env` — the same file the app reads at
+startup, gitignored, one place a key can live. Secrets are write-only in that
+dialog: an existing key shows as "set" and is never rendered back, and a blank
+field keeps the stored value rather than clearing it.
+
+A plugin with no key is **not loaded at all**. Exposing a tool the model cannot
+use costs a turn every time it tries. The gate is a `Configured() bool` method;
+`loadPlugins` checks it. Saving a key calls `reload()`, which rebuilds the
+registry in place and calls `Toolset.Invalidate()` — and because ADK asks the
+Toolset for tools every turn, the new plugin is live on the next message with
+nothing restarting. Only the model and the xAI key need a restart.
+
+## Live tests: real services, off by default
+
+Each plugin with an external API has a `live_test.go` guarded by
+`COGDEBT_LIVE=1`. They are skipped otherwise, because `go test ./...` must not
+boot a sandbox or spend anyone's quota.
+
+```bash
+COGDEBT_LIVE=1 go test ./exts/daytona/ -run Live -v
+```
+
+These caught what stubs cannot. The Daytona plugin passed its stub suite while
+being unable to reach a real sandbox at all.
+
+## Daytona's toolbox does not take the organization key
+
+Worth writing down, because the published spec points the wrong way and the
+detour cost an afternoon:
+
+- `POST /sandbox` and the rest of the control plane take
+  `Authorization: Bearer $DAYTONA_API_KEY`. That part is as documented.
+- `GET /sandbox/{id}/toolbox-proxy-url` returns a **shared** proxy host that
+  rejects that key. Its own error is the clue: it wants "a preview access
+  token". Sending the org key there yields "Bearer token is invalid" — the
+  proxy is trying to parse it as a JWT.
+- The working path is `GET /sandbox/{id}/ports/2280/preview-url`, which returns
+  a **per-sandbox** host AND a token. Call `POST {url}/process/code-run` on that
+  host with `x-daytona-preview-token: {token}`.
+- A freshly created sandbox is `creating`; its preview host does not answer
+  until `started`, so poll first.
+
+Port 2280 and the header were established by probing, not from documentation.
+If code execution starts returning 401, re-probe before assuming the key is bad.
+
 ## Layout
 
 ```

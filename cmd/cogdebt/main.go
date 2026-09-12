@@ -30,6 +30,10 @@ import (
 
 	"github.com/sirius/cogdebt/exts/analogy"
 	"github.com/sirius/cogdebt/exts/assessor"
+	"github.com/sirius/cogdebt/exts/daytona"
+	"github.com/sirius/cogdebt/exts/exa"
+	"github.com/sirius/cogdebt/exts/fal"
+	"github.com/sirius/cogdebt/exts/firecrawl"
 	"github.com/sirius/cogdebt/exts/github"
 	"github.com/sirius/cogdebt/exts/profile"
 	"github.com/sirius/cogdebt/internal/domain"
@@ -82,6 +86,7 @@ func main() {
 		cli     = flag.Bool("cli", false, "terminal REPL instead of the desktop window")
 		shot    = flag.String("screenshot", "", "save a PNG of the window here and exit")
 		say     = flag.String("say", "", "submit this message on startup, for a scripted live run")
+		openCfg = flag.Bool("open-settings", false, "open the settings dialog on startup, for screenshots")
 		after   = flag.Duration("shot-after", 1200*time.Millisecond, "how long to wait before the screenshot")
 		debug   = flag.Bool("debug", false, "shorthand for -log-level debug")
 		logLvl  = flag.String("log-level", "info", "debug, info, warn or error")
@@ -100,13 +105,13 @@ func main() {
 	}
 	defer closeLog()
 
-	if err = run(*dbPath, *plugDir, *user, *naive, *cli, *shot, *say, *after, log); err != nil {
+	if err = run(*dbPath, *plugDir, *user, *naive, *cli, *shot, *say, *openCfg, *after, log); err != nil {
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, after time.Duration, log *slog.Logger) error {
+func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, openCfg bool, after time.Duration, log *slog.Logger) error {
 	loadDotEnv(".env")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -128,27 +133,25 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, af
 	transport := map[string]string{}
 	defer reg.Close()
 
-	// Out-of-process plugins are discovered first and win over their built-in
-	// twins, so dropping a binary into ./plugins swaps the transport with no
-	// code change and no restart of anything else.
-	out := subprocess.LoadDir(reg, pluginDir, log)
-	for _, name := range out {
-		transport[name] = "subprocess"
-	}
-
-	reg.MustLoad(
-		profile.New(db, userID),
-		assessor.New(db, userID),
-		analogy.New(),
-	)
-	if !reg.Has("github") {
-		reg.MustLoad(github.New())
-	}
+	loadPlugins(reg, db, userID, pluginDir, transport, log)
 	if naive {
 		reg.MustLoad(analogy.NewNaive())
 	}
 
-	toolset := ext.NewToolset(ext.ToolsetConfig{
+	// Reload rebuilds the plugin set in place. Because ADK asks the Toolset for
+	// tools on every turn, a key added in Settings switches its plugin on
+	// mid-conversation -- nothing restarts, and the model simply has one more
+	// tool on its next move.
+	var toolset *ext.Toolset
+	reload := func() int {
+		reg.Close()
+		clear(transport)
+		loadPlugins(reg, db, userID, pluginDir, transport, log)
+		toolset.Invalidate()
+		return len(reg.Manifests())
+	}
+
+	toolset = ext.NewToolset(ext.ToolsetConfig{
 		Registry: reg,
 		Model:    llm,
 		ModelFor: func(name string) (model.LLM, error) { return buildNamedModel(ctx, name) },
@@ -194,6 +197,7 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, af
 
 	shell := ui.New(ctx, ui.Config{
 		Model:     modelName(),
+		Settings:  settingsConfig(reload, log),
 		Bridge:    bridge,
 		Mastery:   masteryPanel(db, userID),
 		Analogies: analogyPanel(db, userID),
@@ -207,12 +211,136 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, af
 		// A preview: sample content, no model call.
 		shell.Seed()
 	}
+	if openCfg {
+		shell.OpenSettings(900 * time.Millisecond)
+	}
 	if shot != "" {
 		return shell.RunAndCapture(shot, after)
 	}
 	shell.Run()
 	return nil
 }
+
+// loadPlugins fills the registry. Out-of-process plugins are discovered first
+// and win over their built-in twins, so dropping a binary into ./plugins swaps
+// the transport with no code change.
+//
+// A plugin with no key is not loaded at all rather than loaded and failing:
+// exposing a tool the model cannot use wastes a turn every time it tries.
+func loadPlugins(reg *ext.Registry, db *store.Store, userID, pluginDir string, transport map[string]string, log *slog.Logger) {
+	for _, name := range subprocess.LoadDir(reg, pluginDir, log) {
+		transport[name] = "subprocess"
+	}
+
+	reg.MustLoad(
+		profile.New(db, userID),
+		assessor.New(db, userID),
+		analogy.New(),
+	)
+	if !reg.Has("github") {
+		reg.MustLoad(github.New())
+	}
+
+	// Each of these needs a key. Configured() is the gate.
+	type gated interface {
+		ext.Extension
+		Configured() bool
+	}
+	for _, e := range []gated{firecrawl.New(), exa.New(), fal.New(), daytona.New()} {
+		if e.Configured() {
+			reg.MustLoad(e)
+		}
+	}
+}
+
+// settingsConfig describes what is configurable and what saving does.
+func settingsConfig(reload func() int, log *slog.Logger) ui.SettingsConfig {
+	return ui.SettingsConfig{
+		Fields: func() []ui.SettingField {
+			return []ui.SettingField{
+				{Section: "Model", Key: "COGDEBT_MODEL", Label: "Main model",
+					Help:  "Runs the conversation and decides which tools to call.",
+					Value: modelName(), RestartRequired: true},
+				{Section: "Model", Key: "COGDEBT_ANALOGY_MODEL", Label: "Analogy model",
+					Help:  "Follows a written procedure, so a non-reasoning model is both faster and cleaner here.",
+					Value: envOr("COGDEBT_ANALOGY_MODEL", "grok-4.20-0309-non-reasoning"), RestartRequired: true},
+
+				{Section: "Keys", Key: "XAI_API_KEY", Label: "xAI", Secret: true,
+					Help: "Without this nothing runs.", Value: os.Getenv("XAI_API_KEY"), RestartRequired: true},
+				{Section: "Keys", Key: "GITHUB_TOKEN", Label: "GitHub", Secret: true,
+					Help: "Raises the scan rate limit from 60 requests an hour to 5000.", Value: os.Getenv("GITHUB_TOKEN")},
+				{Section: "Keys", Key: daytona.EnvKey, Label: "Daytona", Secret: true,
+					Help:  "Turns on coding tasks: your code runs against hidden tests, and the grade is the result rather than an opinion.",
+					Value: os.Getenv(daytona.EnvKey)},
+				{Section: "Keys", Key: exa.EnvKey, Label: "Exa", Secret: true,
+					Help: "Lets the tutor find sources by meaning when it does not already have a URL.", Value: os.Getenv(exa.EnvKey)},
+				{Section: "Keys", Key: firecrawl.EnvKey, Label: "Firecrawl", Secret: true,
+					Help: "Reads a web page as clean markdown instead of raw HTML.", Value: os.Getenv(firecrawl.EnvKey)},
+				{Section: "Keys", Key: fal.EnvKey, Label: "fal", Secret: true,
+					Help: "Draws a mapping as a diagram. The key is the full id:secret pair.", Value: os.Getenv(fal.EnvKey)},
+			}
+		},
+		Save: func(changed map[string]string) (string, error) {
+			if err := saveDotEnv(".env", changed); err != nil {
+				return "", err
+			}
+			var restart []string
+			for k, v := range changed {
+				os.Setenv(k, v)
+				if strings.HasPrefix(k, "COGDEBT_") || k == "XAI_API_KEY" {
+					restart = append(restart, k)
+				}
+			}
+
+			n := reload()
+			log.Info("settings saved", obs.FEvent, "settings.save", obs.FCount, len(changed), "plugins", n)
+
+			msg := fmt.Sprintf("Saved. %d plugins active — new tools are available on your next message.", n)
+			if len(restart) > 0 {
+				sort.Strings(restart)
+				msg += " " + strings.Join(restart, ", ") + " applies after a restart."
+			}
+			return msg, nil
+		},
+	}
+}
+
+// saveDotEnv merges values into the env file, preserving anything else in it.
+// The file is the same one the app reads at startup, so there is one place a
+// key can live and it is already gitignored.
+func saveDotEnv(path string, changed map[string]string) error {
+	existing, _ := os.ReadFile(path)
+	lines := strings.Split(string(existing), "\n")
+
+	seen := map[string]bool{}
+	for i, line := range lines {
+		key, _, ok := strings.Cut(line, "=")
+		key = strings.TrimSpace(key)
+		if !ok || strings.HasPrefix(key, "#") {
+			continue
+		}
+		if v, want := changed[key]; want {
+			lines[i] = key + "=" + v
+			seen[key] = true
+		}
+	}
+	keys := make([]string, 0, len(changed))
+	for k := range changed {
+		if !seen[k] {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		lines = append(lines, k+"="+changed[k])
+	}
+
+	out := strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
+	return os.WriteFile(path, []byte(out), 0o600)
+}
+
+// envOr is firstNonEmpty over an environment variable.
+func envOr(key, def string) string { return firstNonEmpty(os.Getenv(key), def) }
 
 // masteryPanel feeds the progress sidebar from the database after each turn.
 func masteryPanel(db *store.Store, userID string) func(context.Context) []ext.MasteryItem {

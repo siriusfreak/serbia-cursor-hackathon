@@ -73,11 +73,41 @@ internal/ext/     ABI, registry, ADK adapter, ViewSpec
 internal/domain/  concepts, mastery, analogies, debt — no external deps
 internal/store/   SQLite (modernc, cgo-free) + namespaced KV for plugins
 internal/ui/      theme, components, renderer, bridge to the runner
-exts/             plugins: profile, assessor, analogy (agent), github (retrieval)
+exts/             plugins: profile, assessor, analogy (agent), github, exa,
+                  firecrawl, fal, daytona
 cmd/ext-github/   the same github plugin, as a standalone process
 docs/             PLUGIN_GUIDE.md
 design/           design canvas artboards, checked against the app theme
 ```
+
+## Keys
+
+Everything except xAI is optional, and a plugin with no key is simply not
+loaded. Open **Settings** in the header to add one; it writes the gitignored
+`.env`, and the plugin is live on your next message without a restart.
+
+| Key | What it turns on |
+|---|---|
+| `XAI_API_KEY` | required — nothing runs without it |
+| `DAYTONA_API_KEY` | coding tasks: your code runs against hidden tests in a sandbox |
+| `EXA_API_KEY` | finding sources by meaning rather than keyword |
+| `FIRECRAWL_API_KEY` | reading a page as markdown instead of raw HTML |
+| `GITHUB_TOKEN` | raises the repository scan limit from 60/hour to 5000 |
+| `FAL_KEY` | drawing a mapping as a diagram (`id:secret`) |
+
+## Coding tasks are the one grade that is not an opinion
+
+With Daytona configured, the tutor can set a small problem, run your solution
+against tests it wrote, and grade on the result. A model scoring prose drifts
+toward whatever it just explained; an assertion does not. And a failing test
+names the belief that failed:
+
+```
+passed=1 failed=1 in 2252ms
+  FAIL is point-in-time correct — AssertionError: used a value from the future
+```
+
+That line is a misconception, already worded for the ledger.
 
 ## Design
 

@@ -74,6 +74,15 @@ func (s *Shell) Ask(text string, after time.Duration) {
 	}()
 }
 
+// OpenSettings shows the configuration dialog after the window settles. It
+// exists so a screenshot can show the dialog without a hand on the mouse.
+func (s *Shell) OpenSettings(after time.Duration) {
+	go func() {
+		time.Sleep(after)
+		fyne.Do(s.openSettings)
+	}()
+}
+
 // RunAndCapture shows the window, saves a PNG once it has settled, and exits.
 // The capture runs on the UI goroutine because the canvas belongs to it.
 func (s *Shell) RunAndCapture(path string, after time.Duration) error {
