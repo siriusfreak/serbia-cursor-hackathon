@@ -78,7 +78,9 @@ func New(ctx context.Context, cfg Config) *Shell {
 	s.win.Resize(fyne.NewSize(1180, 780))
 
 	s.feed = container.NewVBox()
-	s.scroll = container.NewVScroll(s.feed)
+	// The vertical scrollbar is drawn over the content, so the feed carries its
+	// own right-hand clearance; without it the bar sits on top of every card.
+	s.scroll = container.NewVScroll(container.New(layoutPadding{h: 8}, s.feed))
 
 	s.win.SetContent(container.NewBorder(
 		s.header(),
@@ -124,7 +126,7 @@ func (s *Shell) footer() fyne.CanvasObject {
 	row := container.NewBorder(nil, nil, nil, s.send, s.input)
 	line := canvas.NewRectangle(s.pal.line)
 	line.SetMinSize(fyne.NewSize(0, 1))
-	return container.NewVBox(line, s.spinner, container.NewPadded(row))
+	return container.NewVBox(line, container.New(layoutHeight{h: 3}, s.spinner), container.NewPadded(row))
 }
 
 func (s *Shell) sidebar() fyne.CanvasObject {
@@ -253,11 +255,11 @@ func (s *Shell) appendToolResult(name string, result map[string]any) {
 		s.AppendView(ext.View(ext.ViewQuestion, id.ID, q))
 
 	case strings.HasSuffix(name, "profile_save_analogy"):
-		var table ext.AnalogyTableProps
-		if json.Unmarshal(raw, &table) != nil || len(table.Rows) == 0 {
-			return
-		}
-		s.AppendView(ext.View(ext.ViewAnalogyTable, "", table))
+		// Draw from the store rather than from this result. The analogy agent
+		// records its own pairs and the tutor records them again as a safety
+		// net, so the same table arrives twice; the store is the one place that
+		// has already collapsed them.
+		s.drawAnalogies()
 
 	case strings.HasSuffix(name, "fal_illustrate"):
 		var img struct {
@@ -304,12 +306,20 @@ func (s *Shell) onViewEvent(ev ext.ViewEvent) {
 
 func (s *Shell) finishTurn() {
 	s.setBusy(false)
-	s.drawNewAnalogies()
+	// A sub-agent's tool calls do not reach this stream, so an analogy recorded
+	// by the analogy agent alone is only discoverable once the turn is over.
+	s.drawAnalogies()
 	s.refreshMastery()
 }
 
-// drawNewAnalogies appends a card for anything recorded since the last turn.
-func (s *Shell) drawNewAnalogies() {
+// drawAnalogies appends a card for anything recorded since the last time it ran.
+//
+// It is called both when a save is seen and at the end of the turn, and must be
+// idempotent: counting what has already been drawn is what stops the same table
+// appearing twice. Calling it on the save matters for reading order -- the
+// analogy has to be on screen above the question it is the basis for, and the
+// question card is appended in the middle of the same turn.
+func (s *Shell) drawAnalogies() {
 	if s.cfg.Analogies == nil {
 		return
 	}

@@ -145,6 +145,29 @@ func (p layoutPadding) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(w+2*p.h, h+2*p.v)
 }
 
+// layoutHeight forces its children to one height, whatever they ask for.
+//
+// Fyne's infinite progress bar sizes itself like a real progress bar, which
+// means a full-height slab of accent colour across the bottom of the window
+// every time the agent is thinking. A busy indicator should be the quietest
+// thing on screen, not the loudest.
+type layoutHeight struct{ h float32 }
+
+func (l layoutHeight) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	for _, o := range objs {
+		o.Move(fyne.NewPos(0, 0))
+		o.Resize(fyne.NewSize(size.Width, l.h))
+	}
+}
+
+func (l layoutHeight) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w float32
+	for _, o := range objs {
+		w = max(w, o.MinSize().Width)
+	}
+	return fyne.NewSize(w, l.h)
+}
+
 func clamp01(v float64) float64 { return max(0, min(1, v)) }
 
 func pct(v float64) string {
