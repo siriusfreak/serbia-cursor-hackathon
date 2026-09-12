@@ -198,9 +198,6 @@ func (s *Shell) submit() {
 		return
 	}
 	s.input.SetText("")
-	// Whatever was on screen has been answered, or abandoned. Either way it is
-	// no longer a form.
-	s.retireQuestions()
 	s.appendUser(text)
 	s.setBusy(true)
 
@@ -217,6 +214,10 @@ func (s *Shell) submit() {
 }
 
 func (s *Shell) appendUser(text string) {
+	// Any message from the learner settles the open question: they either
+	// answered it or moved past it. Doing this here rather than in submit
+	// covers the scripted run too, which appends the learner's turns directly.
+	s.retireQuestions()
 	s.noteScript(text)
 	bubble := panel(s.pal.surfaceHi, 10, body(text))
 	// Indent from the left so the learner's own words read as a distinct column.

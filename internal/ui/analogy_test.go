@@ -238,10 +238,11 @@ func TestANewQuestionRetiresTheLast(t *testing.T) {
 		t.Errorf("%d answerable cards after a second question arrived, want 1", open)
 	}
 
-	// Answering in the message box below retires whatever is still open.
-	s.retireQuestions()
+	// Any message from the learner settles it -- typed below, or played by the
+	// scripted run, which appends the learner's turns directly.
+	s.appendUser("the replicated log")
 	if open := openCards(feed); open != 0 {
-		t.Errorf("%d answerable cards after the learner answered elsewhere, want 0", open)
+		t.Errorf("%d answerable cards after the learner spoke, want 0", open)
 	}
 }
 
