@@ -138,7 +138,10 @@ func Run(t *testing.T, s Scenario) *Result {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
+	// Eight minutes is roughly twice the slowest healthy run. A scenario that
+	// has gone wrong tends to go wrong by looping, and a generous timeout means
+	// paying twenty minutes to find that out.
+	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Minute)
 	defer cancel()
 
 	// No PluginDir: a scenario runs the in-process plugins only. A stale binary

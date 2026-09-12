@@ -121,6 +121,87 @@ func TestOrderRepository(t *testing.T) {
 	}
 }
 
+func TestCheckReportsTypeOnlySDKWhenSiblingForwards(t *testing.T) {
+	// Firecrawl #3375 shape: the claim adds one option to several SDKs,
+	// Python puts it on the wire, JS only extends the type.
+	in, err := json.Marshal(map[string]any{
+		"title": "feat(sdk): add ignoreRobotsTxt and robotsUserAgent to JS, Python, and Java SDKs",
+		"claim": "Adds `ignoreRobotsTxt` and `robotsUserAgent` crawl parameters to the JS/TS, Python, and Java SDKs",
+		"files": []map[string]string{
+			{
+				"path":  "apps/js-sdk/firecrawl/src/v2/types.ts",
+				"patch": "+  ignoreRobotsTxt?: boolean;\n+  robotsUserAgent?: string | null;",
+			},
+			{
+				"path": "apps/python-sdk/firecrawl/v2/methods/crawl.py",
+				"patch": "+        \"allow_subdomains\": \"allowSubdomains\",\n" +
+					"+        \"ignore_robots_txt\": \"ignoreRobotsTxt\",\n" +
+					"+        \"robots_user_agent\": \"robotsUserAgent\",",
+			},
+			{
+				"path":  "apps/java-sdk/src/main/java/com/firecrawl/models/CrawlOptions.java",
+				"patch": "+    private Boolean ignoreRobotsTxt;\n+    private String robotsUserAgent;",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := New().Invoke(t.Context(), "check", in)
+	if err != nil {
+		t.Fatalf("check: %v", err)
+	}
+	got := decode(t, raw)
+	if got.Holds == nil || *got.Holds {
+		t.Fatal("a type-only SDK next to a wired sibling must set holds=false")
+	}
+	if got.Untested.Subject != "ignoreRobotsTxt" {
+		t.Fatalf("untested.subject = %q, want ignoreRobotsTxt; observed=%q", got.Untested.Subject, got.Observed)
+	}
+	if !strings.Contains(got.Untested.Shape, "js-sdk") {
+		t.Fatalf("untested.shape = %q, want it to name the JS family", got.Untested.Shape)
+	}
+	if !strings.Contains(strings.ToLower(got.Observed), "type") {
+		t.Fatalf("observed = %q, want it to say a type is not a forward", got.Observed)
+	}
+}
+
+func TestCheckAgainstFirecrawlPR(t *testing.T) {
+	if os.Getenv("COGDEBT_LIVE") == "" {
+		t.Skip("set COGDEBT_LIVE=1 to fetch a real public pull request")
+	}
+	raw, err := vcs.New().Invoke(t.Context(), "pull", json.RawMessage(
+		`{"url":"https://github.com/firecrawl/firecrawl/pull/3375"}`))
+	if err != nil {
+		t.Fatalf("vcs_pull: %v", err)
+	}
+	var pr struct {
+		Title string `json:"title"`
+		Claim string `json:"claim"`
+		Files []file `json:"files"`
+	}
+	if err := json.Unmarshal(raw, &pr); err != nil {
+		t.Fatal(err)
+	}
+	in, err := json.Marshal(map[string]any{
+		"title": pr.Title, "claim": pr.Claim, "files": pr.Files, "url": "https://github.com/firecrawl/firecrawl/pull/3375",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := New().Invoke(t.Context(), "check", in)
+	if err != nil {
+		t.Fatalf("oracle_check: %v", err)
+	}
+	got := decode(t, out)
+	if got.Holds == nil || *got.Holds {
+		t.Fatalf("Firecrawl #3375 must surface the JS type-only gap; observed=%q", got.Observed)
+	}
+	if got.Untested.Subject != "ignoreRobotsTxt" && got.Untested.Subject != "robotsUserAgent" {
+		t.Fatalf("untested.subject = %q, want a claimed crawl option; observed=%q", got.Untested.Subject, got.Observed)
+	}
+}
+
 func TestCheckNeverReturnsHoldsTrue(t *testing.T) {
 	in, err := json.Marshal(map[string]any{
 		"title": "Fix FINAL",

@@ -117,6 +117,18 @@ passed=1 failed=1 in 2252ms
 
 That line is a misconception, already worded for the ledger.
 
+## The demo does not need the internet
+
+```bash
+go run ./cmd/cogdebt -demo
+```
+
+Two minutes, no key, no network: one skill in, the full L1-L4 climb out,
+including the analogy table, a generated diagram, and a coding task graded by
+tests. Every card is drawn by the renderer the live app uses — only the content
+is fixed. The mastery numbers and the rung sequence are the ones the real
+assessor produces, and tests hold them to it.
+
 ## Does it actually teach?
 
 `go test ./...` proves each plugin answers correctly. It cannot prove the claim

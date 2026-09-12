@@ -76,7 +76,8 @@ These are the output of live runs of this application against `grok-4.6`. We did
 not edit the sentences. The Daytona test result is the output of a real sandbox
 run.
 
-**Slide 10 — 120 s and 34 s.**
-Measured with the tracing in `internal/obs`, on one turn of the same
+**The 120 s to 34 s measurement** is no longer on a slide, but it is real:
+measured with the tracing in `internal/obs`, on one turn of the same
 conversation, before and after we changed the model of the analogy agent.
-`AGENTS.md` records the numbers and the reason.
+`AGENTS.md` records the numbers and the reason. Use it if a judge asks how the
+agents are tuned.

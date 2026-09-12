@@ -15,6 +15,8 @@
 //     never for others.
 //  3. uneven depth     -- no knob anywhere, but one subject gets a fraction
 //     of the assertions its siblings get.
+//  4. unwired sibling  -- one path family forwards a claimed name into a
+//     request, another family only declares it. A type is not a test.
 package oracle
 
 import (
@@ -30,6 +32,7 @@ import (
 var (
 	backticked = regexp.MustCompile("`([^`\n]{2,80})`")
 	camel      = regexp.MustCompile(`\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b`)
+	lowerCamel = regexp.MustCompile(`\b[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*\b`)
 	snake      = regexp.MustCompile(`\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b`)
 	assignment = regexp.MustCompile(`(?i)([A-Za-z_][A-Za-z0-9_.]*)\s*(?::=|==|=|:)\s*([A-Za-z0-9_'"-]+)`)
 	camelSplit = regexp.MustCompile(`[A-Z][a-z0-9]*`)
@@ -189,22 +192,23 @@ func analyse(title, claim string, files []file) []finding {
 	if len(subjects) == 0 {
 		return nil
 	}
+	var out []finding
+	out = append(out, unwiredFamily(subjects, files)...)
 	lines, paths := addedTestLines(files)
 	if len(lines) == 0 {
-		return nil
+		return out
 	}
 	anchors, counts := anchorsIn(subjects, lines)
 	if len(anchors) == 0 {
-		return nil
+		return out
 	}
 	regions := attribute(anchors, lines, paths)
-	var out []finding
-	out = append(out, unevenKnob(anchors, regions)...)
-	out = append(out, untestedSibling(subjects, counts, anchors, regions)...)
-	if len(out) == 0 {
-		out = append(out, unevenDepth(anchors, regions)...)
+	fromTests := unevenKnob(anchors, regions)
+	fromTests = append(fromTests, untestedSibling(subjects, counts, anchors, regions)...)
+	if len(fromTests) == 0 {
+		fromTests = unevenDepth(anchors, regions)
 	}
-	return out
+	return append(out, fromTests...)
 }
 
 func candidates(text string) []string {
@@ -225,6 +229,9 @@ func candidates(text string) []string {
 		add(m[1])
 	}
 	for _, m := range camel.FindAllString(text, -1) {
+		add(m)
+	}
+	for _, m := range lowerCamel.FindAllString(text, -1) {
 		add(m)
 	}
 	for _, m := range snake.FindAllString(text, -1) {
@@ -352,6 +359,141 @@ func attribute(anchors []string, lines, paths []string) map[string]*region {
 		}
 		out[current].Lines = append(out[current].Lines, line)
 	}
+	return out
+}
+
+// familyOf groups files that ship as one client. "apps/js-sdk/..." and
+// "apps/python-sdk/..." are different families; two files under js-sdk are not.
+func familyOf(path string) string {
+	for _, seg := range strings.Split(path, "/") {
+		s := strings.ToLower(seg)
+		if strings.HasSuffix(s, "-sdk") || strings.HasSuffix(s, "_sdk") || s == "sdk" {
+			return seg
+		}
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) >= 2 {
+		return parts[0] + "/" + parts[1]
+	}
+	return path
+}
+
+func lineMentions(line, subject string) bool {
+	return strings.Contains(strings.ToLower(line), strings.ToLower(subject))
+}
+
+func isForwardLine(line, subject string) bool {
+	if strings.Contains(line, `"`+subject+`"`) || strings.Contains(line, `'`+subject+`'`) {
+		return true
+	}
+	return strings.Contains(line, "request."+subject) ||
+		strings.Contains(line, "payload."+subject) ||
+		strings.Contains(line, "body."+subject)
+}
+
+func isDeclareLine(line, subject string) bool {
+	if isForwardLine(line, subject) {
+		return false
+	}
+	if !lineMentions(line, subject) {
+		return false
+	}
+	if strings.Contains(line, subject+"?:") {
+		return true
+	}
+	lower := strings.ToLower(line)
+	if strings.Contains(lower, "private ") || strings.Contains(lower, "public ") ||
+		strings.Contains(lower, "protected ") {
+		return true
+	}
+	// "name: boolean" / "name: string | null" is a type. "name: true" is not.
+	idx := strings.Index(line, subject+":")
+	if idx < 0 {
+		return false
+	}
+	rest := strings.TrimSpace(line[idx+len(subject)+1:])
+	rest = strings.TrimSuffix(rest, ";")
+	rest = strings.ToLower(rest)
+	return strings.HasPrefix(rest, "boolean") || strings.HasPrefix(rest, "string") ||
+		strings.HasPrefix(rest, "number") || strings.HasPrefix(rest, "bool") ||
+		strings.Contains(rest, "|")
+}
+
+type familyUse struct {
+	declares bool
+	forwards bool
+	path     string
+	quote    string
+}
+
+func classifyFamilies(subject string, files []file) map[string]*familyUse {
+	out := map[string]*familyUse{}
+	for _, f := range files {
+		if f.test() {
+			continue
+		}
+		fam := familyOf(f.Path)
+		u := out[fam]
+		if u == nil {
+			u = &familyUse{}
+			out[fam] = u
+		}
+		for _, raw := range strings.Split(f.Patch, "\n") {
+			body, ok := addedLine(raw)
+			if !ok || !lineMentions(body, subject) {
+				continue
+			}
+			if u.quote == "" {
+				u.quote = clip(body, 160)
+				u.path = f.Path
+			}
+			if isForwardLine(body, subject) {
+				u.forwards = true
+			} else if isDeclareLine(body, subject) {
+				u.declares = true
+			}
+		}
+	}
+	return out
+}
+
+func unwiredFamily(subjects []string, files []file) []finding {
+	var out []finding
+	for _, s := range subjects {
+		uses := classifyFamilies(s, files)
+		var wired, declared []string
+		var weak *familyUse
+		for fam, u := range uses {
+			switch {
+			case u.forwards:
+				wired = append(wired, fam)
+			case u.declares:
+				declared = append(declared, fam)
+				if weak == nil {
+					weak = u
+				}
+			}
+		}
+		if len(wired) == 0 || len(declared) == 0 {
+			continue
+		}
+		sort.Strings(wired)
+		sort.Strings(declared)
+		strong := strings.Join(wired, ", ")
+		weakNames := strings.Join(declared, " and ")
+		out = append(out, finding{
+			Subject: s,
+			Shape:   "forward " + s + " from " + weakNames + " the way " + wired[0] + " already does",
+			Why:     strong + " puts " + s + " on the wire; " + weakNames + " only declares it",
+			Covered: strong,
+			Path:    weak.path,
+			Quote:   weak.quote,
+			Observed: "The claim names " + s + " across " + strong + " and " + weakNames +
+				", but " + weakNames + " only adds a type. " + strong +
+				" already forwards it in the request. A type is not a proof the option is sent.",
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Subject < out[j].Subject })
 	return out
 }
 

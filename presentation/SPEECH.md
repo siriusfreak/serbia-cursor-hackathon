@@ -24,7 +24,7 @@ The same notes are inside the deck. Press **N** during the presentation.
 > not the database, and it is not the model. It is the person who must understand
 > what we built.
 >
-> We built cogdebt for that person."
+> We write a test harness for code. cogdebt is a harness for that person."
 
 Then go to slide 2. Do not explain the product name here.
 
@@ -182,11 +182,6 @@ If the judges are not technical, say only the first two paragraphs.
 > server, and we keep state on the learner's disk. Wonder and Wispr Flow do not
 > fit a Go desktop application.
 >
-> One engineering result. A turn took two minutes. Now it takes thirty-four
-> seconds. We changed one field: the model of each agent. An agent that follows
-> written steps does not need a reasoning model. An agent that decides the next
-> action does need one. We found this with tracing, not by guessing.
->
 > What is next: ask the learner to predict the match before we show it, and keep
 > a list of every wrong belief.
 >
@@ -254,7 +249,7 @@ Stop. Do not add a sentence after "thank you".
 | 3–4 | the name, the number, and why current answers fail | 1:00 |
 | 5–6 | the method and the ladder | 1:15 |
 | 7–8 | three examples and the application | 1:15 |
-| 9–10 | architecture, partners, and the close | 0:45 |
+| 9–10 | architecture, partners, and the close | 0:40 |
 
 You will lose time on slide 2 if you read the list, and on slide 9 if you explain
 too much. Watch those two slides.

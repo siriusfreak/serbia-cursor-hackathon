@@ -3,9 +3,11 @@ package ui
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"image/color"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"fyne.io/fyne/v2"
 	fyneapp "fyne.io/fyne/v2/app"
@@ -39,6 +41,11 @@ type Config struct {
 	Plugins []string
 	// Settings wires the configuration dialog. Zero value hides the button.
 	Settings SettingsConfig
+	// Scripted marks a run that plays a fixed script instead of calling a
+	// model. The footer says so, and typing is inert -- a demo that silently
+	// ignored what someone typed into it would be worse than one that says it
+	// is a recording.
+	Scripted bool
 }
 
 // Shell is the desktop window.
@@ -64,6 +71,8 @@ type Shell struct {
 	// drewFinding is set when oracle_check already painted a REVIEW card this
 	// turn, so drawNewAnalogies does not redraw the same gap as an ANALOGY.
 	drewFinding bool
+	// cyrillic is set once the learner writes in Cyrillic. See phrase.
+	cyrillic bool
 }
 
 // New builds the window. Call Run to show it.
@@ -87,7 +96,9 @@ func New(ctx context.Context, cfg Config) *Shell {
 	s.win.Resize(fyne.NewSize(1180, 780))
 
 	s.feed = container.NewVBox()
-	s.scroll = container.NewVScroll(s.feed)
+	// The vertical scrollbar is drawn over the content, so the feed carries its
+	// own right-hand clearance; without it the bar sits on top of every card.
+	s.scroll = container.NewVScroll(container.New(layoutPadding{h: 8}, s.feed))
 
 	s.win.SetContent(container.NewBorder(
 		s.header(),
@@ -127,13 +138,18 @@ func (s *Shell) footer() fyne.CanvasObject {
 	s.send = widget.NewButton("Send", s.submit)
 	s.send.Importance = widget.HighImportance
 
+	if s.cfg.Scripted {
+		s.input.SetPlaceHolder("Scripted run — no model is being called")
+		s.input.Disable()
+	}
+
 	s.spinner = widget.NewProgressBarInfinite()
 	s.spinner.Hide()
 
 	row := container.NewBorder(nil, nil, nil, s.send, s.input)
 	line := canvas.NewRectangle(s.pal.line)
 	line.SetMinSize(fyne.NewSize(0, 1))
-	return container.NewVBox(line, s.spinner, container.NewPadded(row))
+	return container.NewVBox(line, container.New(layoutHeight{h: 3}, s.spinner), container.NewPadded(row))
 }
 
 func (s *Shell) sidebar() fyne.CanvasObject {
@@ -181,7 +197,7 @@ func (s *Shell) greet() {
 // submit sends the current input to the agent.
 func (s *Shell) submit() {
 	text := strings.TrimSpace(s.input.Text)
-	if text == "" || s.send.Disabled() {
+	if text == "" || s.send.Disabled() || s.cfg.Bridge == nil {
 		return
 	}
 	s.input.SetText("")
@@ -202,6 +218,7 @@ func (s *Shell) submit() {
 }
 
 func (s *Shell) appendUser(text string) {
+	s.noteScript(text)
 	bubble := panel(s.pal.surfaceHi, 10, body(text))
 	// Indent from the left so the learner's own words read as a distinct column.
 	s.feed.Add(container.NewBorder(nil, nil, spacer(120), nil, bubble))
@@ -263,11 +280,11 @@ func (s *Shell) appendToolResult(name string, result map[string]any) {
 		s.AppendView(ext.View(ext.ViewQuestion, id.ID, q))
 
 	case strings.HasSuffix(name, "profile_save_analogy"):
-		var table ext.AnalogyTableProps
-		if json.Unmarshal(raw, &table) != nil || len(table.Rows) == 0 {
-			return
-		}
-		s.AppendView(ext.View(ext.ViewAnalogyTable, "", table))
+		// Draw from the store rather than from this result. The analogy agent
+		// records its own pairs and the tutor records them again as a safety
+		// net, so the same table arrives twice; the store is the one place that
+		// has already collapsed them.
+		s.drawAnalogies()
 
 	case strings.HasSuffix(name, "oracle_check"):
 		var f struct {
@@ -325,27 +342,91 @@ func (s *Shell) AppendView(spec ext.ViewSpec) {
 }
 
 func (s *Shell) onViewEvent(ev ext.ViewEvent) {
-	var payload struct {
-		Answer string `json:"answer"`
+	if text := s.messageFor(ev); text != "" {
+		s.input.SetText(text)
+		s.submit()
 	}
-	if len(ev.Payload) > 0 {
-		_ = ext.ViewSpec{Props: ev.Payload}.DecodeProps(&payload)
+}
+
+// messageFor turns a view event into the learner's next message.
+//
+// The buttons on an analogy card are shortcuts for something the learner could
+// have typed, so that is exactly what they produce: a message, in the feed,
+// visible in the transcript. Nothing happens behind their back.
+func (s *Shell) messageFor(ev ext.ViewEvent) string {
+	switch ev.Event {
+	case ext.EventSubmit, "":
+		var p struct {
+			Answer string `json:"answer"`
+		}
+		_ = decodePayload(ev.Payload, &p)
+		return strings.TrimSpace(p.Answer)
+
+	case ext.EventDigDeeper, ext.EventAskMe:
+		var p ext.PairPayload
+		if decodePayload(ev.Payload, &p) != nil || p.Source == "" || p.Target == "" {
+			return ""
+		}
+		return phrase(ev.Event, p, s.cyrillic)
 	}
-	if payload.Answer == "" {
-		return
+	return ""
+}
+
+// phrase writes the message a door produces.
+//
+// It is written in the learner's own script because the tutor answers in the
+// language it is addressed in: an English button that emits English prose would
+// silently switch a Russian conversation over, mid-lesson. Looking at what the
+// learner has actually been typing is crude, and it is the whole of what is
+// needed to keep that from happening.
+func phrase(event string, p ext.PairPayload, cyrillic bool) string {
+	if event == ext.EventAskMe {
+		if cyrillic {
+			return fmt.Sprintf("Задай мне вопрос по паре «%s — %s». Не объясняй, спрашивай.", p.Source, p.Target)
+		}
+		return fmt.Sprintf("Ask me a question about %q mapping to %q. Don't explain it, test me on it.", p.Source, p.Target)
 	}
-	s.input.SetText(payload.Answer)
-	s.submit()
+	if cyrillic {
+		return fmt.Sprintf("Копни глубже в пару «%s — %s»: что ещё переносится и где именно это ломается?", p.Source, p.Target)
+	}
+	return fmt.Sprintf("Dig deeper into %q mapping to %q: what else carries over, and where exactly does it break?", p.Source, p.Target)
+}
+
+// decodePayload reads an event payload, tolerating an absent one.
+func decodePayload(raw json.RawMessage, out any) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	return json.Unmarshal(raw, out)
+}
+
+// noteScript records which script the learner writes in, so the doors can
+// answer in it. Latin is the default because everything else in the UI is.
+func (s *Shell) noteScript(text string) {
+	for _, r := range text {
+		if unicode.Is(unicode.Cyrillic, r) {
+			s.cyrillic = true
+			return
+		}
+	}
 }
 
 func (s *Shell) finishTurn() {
 	s.setBusy(false)
-	s.drawNewAnalogies()
+	// A sub-agent's tool calls do not reach this stream, so an analogy recorded
+	// by the analogy agent alone is only discoverable once the turn is over.
+	s.drawAnalogies()
 	s.refreshMastery()
 }
 
-// drawNewAnalogies appends a card for anything recorded since the last turn.
-func (s *Shell) drawNewAnalogies() {
+// drawAnalogies appends a card for anything recorded since the last time it ran.
+//
+// It is called both when a save is seen and at the end of the turn, and must be
+// idempotent: counting what has already been drawn is what stops the same table
+// appearing twice. Calling it on the save matters for reading order -- the
+// analogy has to be on screen above the question it is the basis for, and the
+// question card is appended in the middle of the same turn.
+func (s *Shell) drawAnalogies() {
 	if s.cfg.Analogies == nil {
 		return
 	}

@@ -27,7 +27,7 @@ func Render(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
 	case ext.ViewMarkdown:
 		return renderMarkdown(v)
 	case ext.ViewAnalogyTable:
-		return renderAnalogyTable(v)
+		return renderAnalogyTable(v, emit)
 	case ext.ViewQuestion:
 		return renderQuestion(v, emit)
 	case ext.ViewMastery:
@@ -83,7 +83,7 @@ func currentPalette() palette {
 // coloured and never omitted -- an analogy without a stated limit leaves the
 // learner holding a borrowed intuition past the point it holds, which is how
 // this tool would create cognitive debt instead of paying it off.
-func renderAnalogyTable(v ext.ViewSpec) fyne.CanvasObject {
+func renderAnalogyTable(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
 	var p ext.AnalogyTableProps
 	_ = v.DecodeProps(&p)
 	if len(p.Rows) == 0 {
@@ -94,12 +94,12 @@ func renderAnalogyTable(v ext.ViewSpec) fyne.CanvasObject {
 	rows := make([]fyne.CanvasObject, 0, len(p.Rows)+1)
 	rows = append(rows, sectionLabel("ANALOGY"))
 	for _, r := range p.Rows {
-		rows = append(rows, analogyRow(pal, r))
+		rows = append(rows, analogyRow(pal, r, emit))
 	}
 	return container.NewVBox(rows...)
 }
 
-func analogyRow(pal palette, r ext.AnalogyRow) fyne.CanvasObject {
+func analogyRow(pal palette, r ext.AnalogyRow, emit func(ext.ViewEvent)) fyne.CanvasObject {
 	mapping := widget.NewRichText(
 		&widget.TextSegment{Text: r.Source, Style: widget.RichTextStyle{
 			ColorName: theme.ColorNameForeground, TextStyle: fyne.TextStyle{Bold: true}, Inline: true}},
@@ -119,6 +119,9 @@ func analogyRow(pal palette, r ext.AnalogyRow) fyne.CanvasObject {
 	}
 	lines = append(lines, styledText("⚠  "+r.Breakdown,
 		theme.ColorNameWarning, theme.SizeNameText, fyne.TextStyle{Italic: true}))
+	if doors := analogyDoors(r, emit); doors != nil {
+		lines = append(lines, doors)
+	}
 
 	return accented(pal.surface, pal.accent, 8, container.NewVBox(lines...))
 }
@@ -161,6 +164,34 @@ func renderFinding(v ext.ViewSpec) fyne.CanvasObject {
 		lines = append(lines, muted(p.URL))
 	}
 	return accented(pal.surface, pal.danger, 8, container.NewVBox(lines...))
+}
+
+// analogyDoors are the two ways out of a pair and into more learning.
+//
+// Without them an analogy is something the learner reads and moves past, and
+// the only path onward is whatever question the assessor happens to pick next.
+// With them the pair the learner actually cares about becomes the next turn:
+// "dig deeper" asks for more of the mapping, "ask me" asks to be tested on it
+// rather than told about it — which is the harder and more useful of the two,
+// because a pair you can be questioned on is one you have to hold yourself.
+//
+// A read-only render (a preview, a screenshot) passes no emit and gets no
+// buttons, so the card stays a card.
+func analogyDoors(r ext.AnalogyRow, emit func(ext.ViewEvent)) fyne.CanvasObject {
+	if emit == nil {
+		return nil
+	}
+	pair, _ := json.Marshal(ext.PairPayload{Source: r.Source, Target: r.Target})
+
+	dig := widget.NewButton("Dig deeper", func() {
+		emit(ext.ViewEvent{Event: ext.EventDigDeeper, Payload: pair})
+	})
+	ask := widget.NewButton("Ask me", func() {
+		emit(ext.ViewEvent{Event: ext.EventAskMe, Payload: pair})
+	})
+	ask.Importance = widget.HighImportance
+
+	return container.NewHBox(dig, ask)
 }
 
 func renderQuestion(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
@@ -206,7 +237,11 @@ func renderQuestion(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject 
 	if strings.EqualFold(p.Level, "L2") {
 		bar = pal.accent
 	}
-	return accented(pal.surface, bar, 8, container.NewVBox(header, prompt, control, send))
+	// The button sits in an HBox so it keeps its own width. A VBox stretches
+	// its children, and a full-width slab of accent colour under every question
+	// shouts louder than the question does.
+	return accented(pal.surface, bar, 8,
+		container.NewVBox(header, prompt, control, container.NewHBox(send)))
 }
 
 func answerEvent(nodeID, answer string) ext.ViewEvent {

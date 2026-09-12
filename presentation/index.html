@@ -77,6 +77,7 @@ li::before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:1.5p
 /* ---- title slide ------------------------------------------------------ */
 .wordmark{font-family:var(--mono);font-size:92px;font-weight:700;letter-spacing:-.04em}
 .wordmark .dot{color:var(--accent)}
+.tagline{font-size:42px;font-weight:700;letter-spacing:-.02em;color:var(--muted);margin-top:6px}
 
 /* ---- headline list ---------------------------------------------------- */
 .wall{display:grid;gap:10px 22px}
@@ -182,7 +183,8 @@ a:hover{border-bottom-color:var(--accent)}
 <!-- 1 ------------------------------------------------------------------ -->
 <section class="slide">
   <div class="wordmark">cogdebt<span class="dot">.</span></div>
-  <div style="height:34px"></div>
+  <div class="tagline">A harness for you.</div>
+  <div style="height:30px"></div>
   <div class="rule" style="margin:0 0 18px"></div>
   <div class="cols" style="align-items:flex-end">
     <div class="tiny">
@@ -532,26 +534,18 @@ So a new API key in Settings gives the model a new tool on the next message, wit
       </div>
     </div>
     <div style="flex:0 0 392px">
-      <div class="card lead-green">
-        <div class="tiny" style="margin-bottom:9px">MEASURED DURING THE BUILD</div>
-        <div class="cols" style="gap:11px">
-          <div class="stat" style="padding:12px"><div class="n">120s</div><div class="l">one turn, before</div></div>
-          <div class="stat" style="padding:12px"><div class="n gr">34s</div><div class="l">one turn, after</div></div>
+      <div class="card lead-accent">
+        <h3>Next</h3>
+        <div class="sub" style="font-size:15.5px;margin-top:9px;line-height:1.5">
+          Ask the learner to predict the match before the system shows it. Show their answer next to
+          the correct answer. Keep a list of every wrong belief, and ask about it again later.
         </div>
-        <div class="sub" style="font-size:14px;margin-top:11px;line-height:1.45">
-          We changed one field: the model of each agent. An agent that follows written steps does not
-          need a reasoning model. An agent that decides the next action does need one. Tracing found this.
+        <div class="rule" style="margin:16px 0"></div>
+        <div class="sub" style="font-size:15.5px;line-height:1.5">
+          Then build a shared debt list for a team. Cognitive debt is not only an individual problem.
+          It is also what happens when <strong style="color:var(--fg)">the one engineer who understood
+          a service leaves the company</strong>.
         </div>
-      </div>
-      <div style="height:14px"></div>
-      <h3>Next</h3>
-      <div class="sub" style="font-size:15px;margin-top:7px;line-height:1.45">
-        Ask the learner to predict the match before the system shows it. Show their answer next to the
-        correct answer. Keep a list of every wrong belief, and ask about it again later.
-      </div>
-      <div class="tiny" style="margin-top:11px">
-        Then build a shared debt list for a team. Cognitive debt is not only an individual problem.
-        It is also what happens when the one engineer who understood a service leaves the company.
       </div>
     </div>
   </div>
