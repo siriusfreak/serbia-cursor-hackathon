@@ -208,6 +208,11 @@ a side artifact: it is the version of this project that other people actually
 see, and a deck that has drifted from the code is worse than no deck, because it
 is confidently wrong in front of an audience.
 
+Ten slides, five minutes. The slide text is written in **Simple Technical
+English** — short sentences, one idea per sentence, active voice, no idioms and
+no metaphors. Keep new text in that register: the audience is international, and
+a projector is a bad place for a long sentence.
+
 **When you change any of the following, change the deck in the same commit:**
 
 | you changed | update |

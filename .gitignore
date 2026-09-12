@@ -38,7 +38,6 @@ go.work.sum
 # ...except the deck's own assets: the presentation is served from the repo, so
 # a screenshot that is only on someone's laptop ships as a broken image.
 !/presentation/assets/*.png
-!/presentation/assets/*.jpg
 
 # Built out-of-process plugin binaries
 /plugins/

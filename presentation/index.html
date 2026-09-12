@@ -4,12 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>cogdebt — Cursor Community Serbia Hackathon</title>
-<meta name="description" content="cogdebt teaches an engineer a new field through the one they already hold, and marks where that map stops working.">
+<meta name="description" content="cogdebt teaches an engineer a new subject through a subject the engineer already knows, and shows where the comparison stops being correct.">
 <style>
 /* ---------------------------------------------------------------------------
-   The palette is lifted verbatim from internal/ui/theme.go. The deck and the
-   application are the same product, so they are the same colours, and
-   design/deck_test.go fails the build if they drift apart.
+   The palette is copied from internal/ui/theme.go. The deck and the
+   application are one product, so they use one set of colours.
+   design/deck_test.go fails the build if the two sets become different.
+
+   The text on the slides uses Simple Technical English: short sentences, one
+   idea in each sentence, active voice, and no idioms. The audience is
+   international, and a projector is a bad place for a long sentence.
    --------------------------------------------------------------------------- */
 :root{
   --bg:#14161A; --surface:#1C1F25; --surface-hi:#242932; --line:#2C323C;
@@ -21,119 +25,111 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:var(--sans);overflow:hidden}
 
-/* A fixed 1280x720 stage scaled to fit. Layout is then deterministic: what is
-   laid out here is what a projector shows, whatever its resolution. */
+/* A fixed 1280x720 stage, scaled to fit the screen. The layout is then the
+   same on every projector. */
 #viewport{position:fixed;inset:0;display:grid;place-items:center}
 #stage{width:1280px;height:720px;position:relative;flex:0 0 auto}
-/* Centred by default, so a slide that does not fill 720px sits in the middle
-   instead of hanging from the top over a void. A slide that wants a pinned
-   footer puts a .grow before it, which absorbs the free space instead. */
-.slide{position:absolute;inset:0;padding:64px 76px;display:none;flex-direction:column;
+/* Slides are centred. A slide that does not fill 720px stays in the middle.
+   A slide that needs a footer at the bottom puts a .grow before the footer. */
+.slide{position:absolute;inset:0;padding:60px 72px;display:none;flex-direction:column;
   justify-content:center;animation:in .28s ease both}
 .slide.on{display:flex}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ---- type ramp -------------------------------------------------------- */
 h1{font-size:76px;line-height:1.02;letter-spacing:-.025em;font-weight:700}
-h2{font-size:40px;line-height:1.12;letter-spacing:-.018em;font-weight:700;margin-bottom:6px}
-h3{font-size:21px;font-weight:700;letter-spacing:-.005em}
+h2{font-size:38px;line-height:1.14;letter-spacing:-.018em;font-weight:700;margin-bottom:6px}
+h3{font-size:20px;font-weight:700;letter-spacing:-.005em}
 .kicker{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
-  font-weight:700;margin-bottom:22px}
+  font-weight:700;margin-bottom:20px}
 .kicker b{color:var(--accent);font-weight:700}
-.lead{font-size:26px;line-height:1.42;color:var(--fg);max-width:62ch}
-.sub{font-size:19px;line-height:1.5;color:var(--muted);max-width:70ch}
+.lead{font-size:24px;line-height:1.42;color:var(--fg);max-width:64ch}
+.sub{font-size:18px;line-height:1.5;color:var(--muted);max-width:72ch}
 .tiny{font-size:13px;color:var(--muted);line-height:1.5}
 .mono{font-family:var(--mono)}
 .am{color:var(--accent)} .gr{color:var(--success)} .wn{color:var(--warn)} .mu{color:var(--muted)}
 strong{font-weight:700}
 .grow{flex:1}
-.rule{height:1px;background:var(--line);margin:22px 0}
+.rule{height:1px;background:var(--line);margin:20px 0}
+ul{list-style:none}
+li{position:relative;padding-left:20px;margin-bottom:11px;line-height:1.4}
+li::before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:1.5px;background:var(--accent)}
 
 /* ---- primitives ------------------------------------------------------- */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:17px 19px}
 .card.lead-accent{border-left:3px solid var(--accent)}
 .card.lead-green{border-left:3px solid var(--success)}
 .card.lead-warn{border-left:3px solid var(--warn)}
 .chip{display:inline-block;background:var(--surface-hi);border:1px solid var(--line);
-  border-radius:999px;padding:5px 13px;font-size:13px;color:var(--muted);font-family:var(--mono)}
-.chip.on{color:var(--accent);border-color:rgba(232,163,61,.38)}
-.chip.off{opacity:.5}
-.grid{display:grid;gap:14px}
+  border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.chip.off{opacity:.55}
+.grid{display:grid;gap:13px}
 .g2{grid-template-columns:1fr 1fr}
 .g3{grid-template-columns:repeat(3,1fr)}
-.g4{grid-template-columns:repeat(4,1fr)}
-.cols{display:flex;gap:26px}
+.cols{display:flex;gap:24px}
 .cols>*{flex:1;min-width:0}
 
 /* ---- title slide ------------------------------------------------------ */
-.title-slide{justify-content:center}
-.wordmark{font-family:var(--mono);font-size:96px;font-weight:700;letter-spacing:-.04em}
+.wordmark{font-family:var(--mono);font-size:92px;font-weight:700;letter-spacing:-.04em}
 .wordmark .dot{color:var(--accent)}
 
-/* ---- headline wall ---------------------------------------------------- */
-.wall{display:grid;grid-template-columns:1fr 1fr;gap:13px 22px}
-.hl{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
-.hl .d{font-family:var(--mono);font-size:11px;color:var(--muted);flex:0 0 62px}
-.hl .t{font-size:16.5px;line-height:1.32}
-.hl .p{font-family:var(--mono);font-size:11px;color:var(--accent);margin-left:auto;flex:0 0 auto;padding-left:8px}
+/* ---- headline list ---------------------------------------------------- */
+.wall{display:grid;gap:10px 22px}
+.hl{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}
+.hl .d{font-family:var(--mono);font-size:11px;color:var(--muted);flex:0 0 58px}
+.hl .t{font-size:15px;line-height:1.3;flex:1;min-width:0}
+.hl .p{font-family:var(--mono);font-size:11px;color:var(--accent);flex:0 0 auto;padding-left:10px}
 
-/* ---- analogy row (the app's hero widget, redrawn) --------------------- */
+/* ---- analogy row (the same widget the application draws) -------------- */
 .pair{background:var(--surface);border-left:3px solid var(--accent);border-radius:8px;
-  padding:14px 17px;margin-bottom:9px}
-.pair .map{font-size:19px;font-weight:700;margin-bottom:3px}
-.pair .map .to{color:var(--muted);font-weight:400;font-size:14px;padding:0 7px}
+  padding:13px 16px;margin-bottom:9px}
+.pair .map{font-size:18px;font-weight:700;margin-bottom:3px}
+.pair .map .to{color:var(--muted);font-weight:400;font-size:13px;padding:0 6px}
 .pair .map .tg{color:var(--accent)}
-.pair .role{font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:7px}
-.pair .br{font-size:14.5px;line-height:1.4;color:var(--warn);font-style:italic}
+.pair .role{font-size:11.5px;color:var(--muted);font-family:var(--mono);margin-bottom:6px}
+.pair .br{font-size:14px;line-height:1.4;color:var(--warn);font-style:italic}
 .pair .br b{font-style:normal;font-weight:700}
+.pair.small{margin-bottom:0}
+.pair.small .map{font-size:15.5px}
+.pair.small .br{font-size:12.5px}
 
 /* ---- ladder ----------------------------------------------------------- */
-.rung{display:flex;gap:16px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
-.rung .lv{font-family:var(--mono);font-weight:700;font-size:17px;flex:0 0 40px;padding-top:1px}
+.rung{display:flex;gap:15px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.rung .lv{font-family:var(--mono);font-weight:700;font-size:17px;flex:0 0 38px;padding-top:1px}
 .rung.l2{background:linear-gradient(90deg,rgba(232,163,61,.09),transparent);
   border-radius:6px;padding-left:10px;margin-left:-10px}
 .rung .nm{font-size:17px;font-weight:700}
 .rung .ds{font-size:14px;color:var(--muted);line-height:1.4;margin-top:2px}
 
 /* ---- formula ---------------------------------------------------------- */
-.formula{font-family:var(--mono);font-size:27px;text-align:center;padding:24px 0;line-height:1.5}
+.formula{font-family:var(--mono);font-size:26px;text-align:center;padding:18px 0;line-height:1.5}
 .formula .t1{color:var(--accent)} .formula .t2{color:var(--success)} .formula .t3{color:var(--warn)}
 
 /* ---- architecture stack ---------------------------------------------- */
 .layer{background:var(--surface);border:1px solid var(--line);border-radius:8px;
-  padding:11px 17px;margin-bottom:7px;display:flex;align-items:baseline;gap:14px}
-.layer .nm{font-weight:700;font-size:16px;flex:0 0 172px}
-.layer .ds{font-size:13.5px;color:var(--muted);line-height:1.35}
+  padding:9px 15px;margin-bottom:6px;display:flex;align-items:baseline;gap:13px}
+.layer .nm{font-weight:700;font-size:15px;flex:0 0 148px}
+.layer .ds{font-size:12.5px;color:var(--muted);line-height:1.35}
 .layer.seam{border-color:var(--accent);background:rgba(232,163,61,.07)}
 .layer.pure{border-color:rgba(79,191,139,.42)}
-.arrow{text-align:center;color:var(--muted);font-size:13px;margin:1px 0 6px;font-family:var(--mono)}
 
 /* ---- tables ----------------------------------------------------------- */
-table{width:100%;border-collapse:collapse;font-size:14.5px}
+table{width:100%;border-collapse:collapse;font-size:14px}
 th{text-align:left;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
-  padding:0 10px 8px 0;font-weight:700;border-bottom:1px solid var(--line)}
-td{padding:11px 10px 11px 0;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.35}
+  padding:0 10px 7px 0;font-weight:700;border-bottom:1px solid var(--line)}
+td{padding:7px 10px 7px 0;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.35}
 td.k{font-family:var(--mono);color:var(--fg);white-space:nowrap}
 td.m{color:var(--muted)}
 
 /* ---- code ------------------------------------------------------------- */
-pre{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;
-  font-family:var(--mono);font-size:14px;line-height:1.5;overflow:hidden;color:var(--fg)}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+  font-family:var(--mono);font-size:13px;line-height:1.5;overflow:hidden;color:var(--fg)}
 pre .c{color:var(--muted)} pre .kw{color:var(--accent)} pre .st{color:var(--success)}
 
 /* ---- stat ------------------------------------------------------------- */
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px}
-.stat .n{font-family:var(--mono);font-size:40px;font-weight:700;line-height:1.1}
-.stat .l{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.35}
-
-/* ---- team ------------------------------------------------------------- */
-.person{display:flex;gap:20px;align-items:center;padding:22px}
-.avatar{width:148px;height:148px;border-radius:16px;flex:0 0 148px;background:var(--surface-hi);
-  border:1px solid var(--line);background-size:cover;background-position:center;
-  display:grid;place-items:center;font-family:var(--mono);font-size:46px;font-weight:700;
-  color:var(--accent);overflow:hidden}
-.avatar span{mix-blend-mode:normal}
-.avatar.has-photo span{display:none}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.stat .n{font-family:var(--mono);font-size:34px;font-weight:700;line-height:1.1}
+.stat .l{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.35}
 
 /* ---- screenshot ------------------------------------------------------- */
 .shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);
@@ -158,7 +154,7 @@ pre .c{color:var(--muted)} pre .kw{color:var(--accent)} pre .st{color:var(--succ
 #help.on{opacity:1}
 aside.notes{display:none}
 
-/* ---- print / PDF fallback --------------------------------------------- */
+/* ---- print, for a PDF copy -------------------------------------------- */
 @media print{
   @page{size:1280px 720px;margin:0}
   html,body{overflow:visible;height:auto}
@@ -175,730 +171,396 @@ aside.notes{display:none}
 <div id="viewport"><div id="stage">
 
 <!-- 1 ------------------------------------------------------------------ -->
-<section class="slide title-slide">
+<section class="slide">
   <div class="wordmark">cogdebt<span class="dot">.</span></div>
-  <div style="height:20px"></div>
-  <div class="lead" style="font-size:30px;max-width:56ch">
-    Learn a new field <strong>through the one you already hold</strong> —
-    and be told exactly where that map <span class="wn">stops working</span>.
+  <div style="height:18px"></div>
+  <div class="lead" style="font-size:29px;max-width:58ch">
+    Learn a new subject through a subject <strong>you already know</strong>.
+    The system also shows you where that comparison
+    <span class="wn">stops being correct</span>.
   </div>
-  <div style="height:30px"></div>
+  <div style="height:28px"></div>
   <div class="rule" style="margin:0 0 18px"></div>
   <div class="cols" style="align-items:flex-end">
     <div class="tiny">
-      <strong style="color:var(--fg)">Sirius</strong> — Team Lead, Nebius &nbsp;·&nbsp;
-      <strong style="color:var(--fg)">Danila</strong> — Senior Go Developer, Group-IB
+      <strong style="color:var(--fg)">Sirius</strong> — Team Lead, Nebius · architecture and idea<br>
+      <strong style="color:var(--fg)">Danila</strong> — Senior Go Developer, Group-IB · Go implementation
     </div>
     <div class="tiny" style="text-align:right">
       Cursor Community Serbia Hackathon<br>
-      Go · plugin ABI · Google Agent Development Kit · local-first
+      Go · plugin ABI · Google Agent Development Kit · local application
     </div>
   </div>
   <aside class="notes">
-We are solving for the weakest link in any technical system: the human being in it.
-Ninety seconds on why that is suddenly urgent, then I will show you the thing running.
+Say two sentences, then go to slide 2. Do not explain the name here.
+Slide 3 explains the name, and it works better after the audience sees the problem.
   </aside>
 </section>
 
 <!-- 2 ------------------------------------------------------------------ -->
 <section class="slide">
   <div class="kicker">The problem</div>
-  <h2>Every layer of our stack got faster this year.</h2>
-  <h2 class="am">The human in it did not.</h2>
-  <div style="height:26px"></div>
-  <div class="lead">
-    We have spent two years making the machine part of engineering faster.
-    The part that <strong>understands</strong> the system is the same speed it
-    always was — and it is now being asked to keep up with output it never wrote.
-  </div>
-  <div class="grow"></div>
-  <div class="card lead-accent">
-    <div class="sub" style="color:var(--fg)">
-      This is not a thesis we invented for a hackathon. Engineers have been
-      saying it out loud, on Hacker News, all year.
+  <h2>Engineers lose technical skills when they use AI tools.</h2>
+  <div style="height:18px"></div>
+  <div class="cols" style="gap:26px;align-items:flex-start">
+    <div style="flex:0 0 420px">
+      <ul style="font-size:16.5px">
+        <li><strong>Nature, June 2026.</strong> Two studies measured this effect. One tested doctors.
+          One tested programmers. Both groups worked worse without the AI tool.</li>
+        <li><strong>Ford, June 2026.</strong> Ford hired 350 engineers again. The AI system did not keep
+          the expert knowledge. Junior engineers had nobody to learn from.</li>
+        <li><strong>Every month.</strong> Engineers write about this problem on Hacker News.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="wall">
+        <div class="hl"><span class="d">Jun 19</span><span class="t">Is AI ruining our skills? Early results are in — and they're not good</span><span class="p">Nature</span></div>
+        <div class="hl"><span class="d">Jun 25</span><span class="t">Ford rehires 350 engineers after AI fails to preserve expertise</span></div>
+        <div class="hl"><span class="d">Aug 13</span><span class="t">Understanding is the new bottleneck</span></div>
+        <div class="hl"><span class="d">Aug 24</span><span class="t">Coding expertise is going to collapse from AI reliance</span></div>
+        <div class="hl"><span class="d">Aug 29</span><span class="t">LLMs are making me lose my savviness</span></div>
+        <div class="hl"><span class="d">Aug 30</span><span class="t">No AI Fridays</span></div>
+      </div>
     </div>
   </div>
+  <div style="height:20px"></div>
+  <div class="tiny">
+    Six of twelve Hacker News stories about this problem, published between June and August 2026.
+  </div>
   <aside class="notes">
-Don't argue the point — hand it to the audience as something they already feel.
-Then move straight to the evidence wall; the headlines do the arguing.
+Do not read the list on the right. Point at two items.
+Nature: the effect is measured now, not only felt. Ford: the problem already has a cost.
   </aside>
 </section>
 
 <!-- 3 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">The evidence · <b>Hacker News, April–September 2026</b></div>
-  <div class="wall">
-    <div class="hl"><span class="d">Apr 26</span><span class="t">The West Forgot How to Make Things. Now It's Forgetting How to Code</span></div>
-    <div class="hl"><span class="d">Apr 26</span><span class="t">A.I. is creating engineers who can't think without it</span></div>
-    <div class="hl"><span class="d">May 04</span><span class="t">Agentic Coding Is a Trap</span></div>
-    <div class="hl"><span class="d">May 14</span><span class="t">God Damn AI is making me dumb</span></div>
-    <div class="hl"><span class="d">Jun 19</span><span class="t">Is AI ruining our skills? Early results are in — and they're not good</span><span class="p">Nature</span></div>
-    <div class="hl"><span class="d">Jun 25</span><span class="t">Ford rehires 350 engineers after AI fails to preserve expertise or train juniors</span></div>
-    <div class="hl"><span class="d">Jun 28</span><span class="t">Reflections on Software Engineering in the Age of AI</span></div>
-    <div class="hl"><span class="d">Aug 13</span><span class="t">Understanding is the new bottleneck</span><span class="p">13</span></div>
-    <div class="hl"><span class="d">Aug 24</span><span class="t">Coding expertise is going to collapse from AI reliance</span><span class="p">13</span></div>
-    <div class="hl"><span class="d">Aug 26</span><span class="t">Beyond Recall and the Illusion of Competence</span><span class="p">20</span></div>
-    <div class="hl"><span class="d">Aug 29</span><span class="t">LLMs are making me lose my savviness</span><span class="p">14</span></div>
-    <div class="hl"><span class="d">Aug 30</span><span class="t">No AI Fridays</span><span class="p">14</span></div>
+  <div class="kicker">The name, and the number</div>
+  <h2>Cognitive debt</h2>
+  <div class="lead" style="margin-top:10px">
+    Cognitive debt is the difference between the system you operate and the knowledge you hold.
+    Professor Margaret-Anne Storey defined this term.
   </div>
-  <div class="grow"></div>
+  <div class="formula">
+    debt(c) = <span class="t1">frequency(c)</span> × <span class="t2">depth(c)</span> × (1 − <span class="t3">mastery(c)</span>)
+  </div>
+  <div class="grid g3">
+    <div class="card lead-accent">
+      <h3 class="am">frequency</h3>
+      <div class="sub" style="font-size:14.5px;margin-top:6px">How often you use the concept.
+        We read your public repositories. We do not ask you, because people rate themselves too high.</div>
+    </div>
+    <div class="card lead-green">
+      <h3 class="gr">depth</h3>
+      <div class="sub" style="font-size:14.5px;margin-top:6px">How many other concepts need this one.
+        A weak foundation costs more than a weak detail.</div>
+    </div>
+    <div class="card lead-warn">
+      <h3 class="wn">1 − mastery</h3>
+      <div class="sub" style="font-size:14.5px;margin-top:6px">How little of the concept you hold.
+        Only graded answers change this value, and each answer changes it by a small amount.</div>
+    </div>
+  </div>
+  <div style="height:20px"></div>
   <div class="tiny">
-    Pulled from <span class="mono am">digest.siriusfrk.ru</span> — an 8,864-story Hacker News archive one of us runs.
-    Twelve of these in five months, from working engineers, a Nature news piece, and Bloomberg.
-    The fear is not niche.
+    Debt is a good model for this problem. Debt grows slowly. Debt is not visible.
+    And <strong class="am">you can pay debt back</strong>.
   </div>
   <aside class="notes">
-Do NOT read these out. Let them land as a wall, point at three:
-Nature — this is measured now. Ford — this already cost someone real money.
-"No AI Fridays" — that's the creator of HTMX, and it tells you how bad it feels from the inside.
+Two facts. First, the term is not ours: a professor defined it.
+Second, we made it a number, so the program can sort concepts and select the most expensive one.
   </aside>
 </section>
 
 <!-- 4 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">It stopped being a feeling · <b>it is measured</b></div>
-  <h2>Two independent studies, two professions, the same result.</h2>
-  <div style="height:24px"></div>
-  <div class="grid g2">
-    <div class="card lead-warn">
-      <h3>Endoscopists</h3>
-      <div class="sub" style="margin-top:8px;font-size:16px">
-        <em>The Lancet</em>, 2025. After habituating to AI assistance, detection
-        quality dropped when the assistance was taken away.
-      </div>
-    </div>
-    <div class="card lead-warn">
-      <h3>Programmers</h3>
-      <div class="sub" style="margin-top:8px;font-size:16px">
-        Anthropic, 2026. The same shape: people who got used to the assistant
-        performed worse on the same task without it.
-      </div>
-    </div>
-  </div>
+  <div class="kicker">Available solutions</div>
+  <h2>Every available solution <span class="wn">removes something</span>.</h2>
   <div style="height:22px"></div>
-  <div class="lead">
-    Skill loss from AI assistance is no longer anecdote. It is the
-    <strong>first measurable deskilling effect</strong> of this generation of tools.
+  <div class="grid g3">
+    <div class="card">
+      <h3 class="wn">Stop the tool</h3>
+      <div class="sub" style="font-size:15px;margin-top:7px">Disable the AI assistant one day each week.</div>
+      <div class="tiny" style="margin-top:11px">Cost: 20 % of the output.</div>
+    </div>
+    <div class="card">
+      <h3 class="wn">Work slower</h3>
+      <div class="sub" style="font-size:15px;margin-top:7px">Type the generated code again by hand, line by line.</div>
+      <div class="tiny" style="margin-top:11px">Cost: the speed you bought the tool for.</div>
+    </div>
+    <div class="card">
+      <h3 class="wn">Memorise</h3>
+      <div class="sub" style="font-size:15px;margin-top:7px">Use flashcards and repeat them at intervals.</div>
+      <div class="tiny" style="margin-top:11px">Cost: memory is not understanding.</div>
+    </div>
   </div>
-  <div class="grow"></div>
-  <div class="tiny">Reported in Nature, 19 June 2026 — “Is AI ruining our skills? Early results are in — and they're not good”.</div>
+  <div style="height:24px"></div>
+  <div class="lead">
+    These are three real products. Each one stops <em>new</em> debt.
+    <strong class="am">No product pays back the debt that already exists.</strong>
+  </div>
+  <div style="height:20px"></div>
+  <div class="tiny">Our method does not remove the AI tool. It uses the knowledge the engineer already has.</div>
   <aside class="notes">
-This is the slide that turns the room. Two professions you cannot dismiss —
-one of them is doctors. Same effect. Say the phrase "first measurable deskilling effect" slowly.
+Be fair about these three. They are honest attempts and real products.
+The important part is the shape they share: each one subtracts. We add.
   </aside>
 </section>
 
 <!-- 5 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">The name</div>
-  <h1 style="font-size:64px">Cognitive debt.</h1>
-  <div style="height:22px"></div>
-  <div class="lead">
-    The gap between a system that keeps evolving and the understanding
-    the people responsible for it actually hold.
+  <div class="kicker">Our method · <b>match by role, not by name</b></div>
+  <h2>An analogy connects two subjects by structural role.</h2>
+  <div class="sub" style="margin-top:10px;font-size:17px">
+    We do not match two things because both are called "a controller". We match them because both are
+    the single source of truth that other components compare themselves against.
   </div>
   <div style="height:16px"></div>
-  <div class="sub">
-    Coined by <strong>Prof. Margaret-Anne Storey</strong>, and now in general
-    circulation — it is the word engineers reach for when they describe what
-    generative AI is doing to them. We named the project after it.
+  <div class="pair">
+    <div class="map">etcd <span class="to">maps to</span> <span class="tg">feature store</span></div>
+    <div class="role">shared role · source_of_truth</div>
+    <div class="br"><b>⚠ </b>etcd is small and strongly consistent. A feature store is a view over unclean
+      events, with an offline path and an online path. Point-in-time correctness is a new requirement
+      that etcd never had.</div>
   </div>
-  <div class="grow"></div>
-  <div class="card lead-accent">
-    <div class="lead" style="font-size:22px">
-      Debt is the right metaphor. It compounds silently, it is invisible until
-      you need the money, and <strong>you can pay it down</strong>.
+  <div class="pair">
+    <div class="map">liveness probe <span class="to">maps to</span> <span class="tg">drift detection</span></div>
+    <div class="role">shared role · degradation_signal</div>
+    <div class="br"><b>⚠ </b>A probe is cheap, binary and immediate. Labels arrive late and incomplete.
+      Drift can look correct while the business metric fails.</div>
+  </div>
+  <div style="height:20px"></div>
+  <div class="card lead-warn">
+    <div class="lead" style="font-size:20px">
+      The orange line is the product. An analogy without a stated limit
+      <strong>does not pay down cognitive debt. It creates more debt</strong>, because the engineer
+      uses the analogy after the point where it is correct.
+    </div>
+    <div class="tiny" style="margin-top:8px">
+      <span class="mono">Mapping.Breakdown</span> is a required field in the domain model and in the plugin
+      schema. A test checks that the agent instruction still asks for it.
     </div>
   </div>
   <aside class="notes">
-Important: we did not invent this term. A professor did, and the industry adopted it.
-That's why the product is called cogdebt — and the whole pitch is the last sentence:
-debt can be paid down. Nobody is doing that part.
+Slow down here. This is the one idea nobody else in the room will state.
+Everybody has received a bad analogy and then used it too far. We made the limit mandatory in the type.
   </aside>
 </section>
 
 <!-- 6 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">What is on offer today</div>
-  <h2>Every existing answer <span class="wn">subtracts</span> something.</h2>
-  <div style="height:26px"></div>
-  <div class="grid g3">
-    <div class="card">
-      <h3 class="wn">Turn it off</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">
-        “No AI Fridays” — one day a week with the assistants disabled.
-      </div>
-      <div class="tiny" style="margin-top:12px">Costs: a fifth of your velocity.</div>
+  <div class="kicker">The question ladder</div>
+  <h2>Four levels. The program selects the level, not the model.</h2>
+  <div style="height:14px"></div>
+  <div class="rung"><span class="lv am">L1</span><div><div class="nm">Find the match</div>
+    <div class="ds">Name the item in the new subject that has the role you already know.</div></div></div>
+  <div class="rung l2"><span class="lv wn">L2</span><div><div class="nm">Find the limit <span class="tiny wn">← this level does the teaching</span></div>
+    <div class="ds">Say where the analogy stops being correct. The system does not tell you. You must find it.</div></div></div>
+  <div class="rung"><span class="lv gr">L3</span><div><div class="nm">Use the new terms</div>
+    <div class="ds">Answer in the vocabulary of the new subject, without the analogy.</div></div></div>
+  <div class="rung"><span class="lv gr">L4</span><div><div class="nm">Solve a problem</div>
+    <div class="ds">Solve a small task that needs two or three new concepts together. Tests grade the result.</div></div></div>
+  <div style="height:20px"></div>
+  <div class="card lead-accent">
+    <div class="sub" style="color:var(--fg);font-size:16.5px">
+      A deterministic function selects the concept and the level. It uses the debt value and the measured
+      mastery. The language model only writes the text of the question. A model that selects the
+      difficulty <em>and</em> grades the answer moves towards the topic it explained last.
     </div>
-    <div class="card">
-      <h3 class="wn">Be slower on purpose</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">
-        Forbid the agent from touching files; retype every generated line by hand.
-      </div>
-      <div class="tiny" style="margin-top:12px">Costs: the reason you bought the tool.</div>
-    </div>
-    <div class="card">
-      <h3 class="wn">Memorise</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">
-        Spaced-repetition flashcards against “skill rot”.
-      </div>
-      <div class="tiny" style="margin-top:12px">Costs: recall is not understanding.</div>
-    </div>
-  </div>
-  <div class="grow"></div>
-  <div class="lead">
-    Three real products and practices, all from the same Hacker News cluster.
-    All three treat the tool as the problem. <strong class="am">Nobody is paying down the debt.</strong>
   </div>
   <aside class="notes">
-These are real: noaifridays.com, the retype-by-hand post, and fata.dev.
-Be generous about them — they're honest attempts. The point is the shape they share:
-subtraction. We add.
+This is the design decision to defend. The model writes sentences.
+The model does not decide if you passed, and it does not decide what comes next. That part is code, and it is testable.
   </aside>
 </section>
 
 <!-- 7 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">Our bet</div>
-  <h2>Don't take the tool away.</h2>
-  <h2 class="gr">Pay the debt with what the engineer already owns.</h2>
-  <div style="height:26px"></div>
-  <div class="cols">
+  <div class="kicker">Three examples · <b>real output from live runs</b></div>
+  <div class="cols" style="gap:16px;align-items:stretch">
     <div>
-      <div class="lead" style="font-size:22px">
-        A senior engineer is not empty. They hold a deep, load-bearing model of
-        <em>some</em> field. The fastest route into a new one is not a tutorial —
-        it is a <strong>correspondence</strong> to the one they already have.
+      <div class="tiny" style="margin-bottom:8px">KUBERNETES, GO <span class="mu">→</span> ML PIPELINES</div>
+      <div class="pair small">
+        <div class="map">rolling update <span class="to">→</span> <span class="tg">model promotion</span></div>
+        <div class="role">role · rollback</div>
+        <div class="br"><b>⚠ </b>A Deployment rollback restores one exact binary. A model rollback does not
+          restore the training data. Version n−1 can be equally wrong.</div>
       </div>
     </div>
-    <div class="card lead-green">
-      <div class="tiny" style="margin-bottom:10px">HACKER NEWS · 10 SEP 2026 · 27 points</div>
-      <h3>Douglas Hofstadter:<br>Analogy as the Core of Cognition</h3>
-      <div class="sub" style="font-size:15px;margin-top:10px">
-        Analogy is not a garnish on thought — it is the interstate highway
-        system of it. Categorisation is a <em>consequence</em> of analogy.
+    <div>
+      <div class="tiny" style="margin-bottom:8px">RATE LIMITING <span class="mu">→</span> THERMODYNAMICS</div>
+      <div class="pair small">
+        <div class="map">rate limiting <span class="to">→</span> <span class="tg">entropy</span></div>
+        <div class="role">role · quota of allowed states</div>
+        <div class="br"><b>⚠ </b>You can increase a rate limit, because a rate limit is a policy. You cannot
+          increase entropy, because entropy counts the states the system can occupy.</div>
+      </div>
+    </div>
+    <div>
+      <div class="tiny" style="margin-bottom:8px">SQL, PANDAS <span class="mu">→</span> DYNAMIC PROGRAMMING</div>
+      <div class="pair small">
+        <div class="map">window function <span class="to">→</span> <span class="tg">recurrence</span></div>
+        <div class="role">role · value from earlier values</div>
+        <div class="br"><b>⚠ </b>A window function runs in one pass. A recurrence can branch, and it can
+          compute the same state again until you add memoisation.</div>
       </div>
     </div>
   </div>
-  <div class="grow"></div>
-  <div class="tiny">
-    The method underneath is Gentner's <strong>structure mapping</strong>: correspondences are matched on
-    the <span class="am">role a thing plays</span>, never on what it is called.
+  <div style="height:20px"></div>
+  <div class="cols" style="gap:20px;align-items:center">
+    <div style="flex:0 0 460px">
+      <pre style="font-size:12.5px"><span class="c"># the learner believes: "@lru_cache on a recursion is DP"</span>
+<span class="c"># the code runs in a Daytona sandbox</span>
+<span class="kw">passed</span>=1  <span class="kw">failed</span>=1  <span class="c">in 2252ms</span>
+<span class="wn">FAIL</span> is point-in-time correct
+  AssertionError: <span class="st">used a value from the future</span></pre>
+    </div>
+    <div class="card lead-warn">
+      <div style="font-size:16px;line-height:1.42">
+        At level L4 the system executes the code. The test result is the grade.
+        A failed test also <strong>names the wrong belief</strong>, in the words of the task.
+        This is the only grade in the system that is not an opinion.
+      </div>
+    </div>
   </div>
   <aside class="notes">
-The Hofstadter talk surfaced on HN two days ago — same archive as the problem slides.
-That's a nice line: the same community that named the disease also pointed at the cure.
+These sentences come from live runs. We did not write them.
+Then point at the test output. A model that grades text moves toward what it explained.
+A test does not. And the test name is the wrong belief, already written down.
   </aside>
 </section>
 
 <!-- 8 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">Debt is a number, not a mood</div>
-  <div class="formula">
-    debt(c) = <span class="t1">frequency(c)</span> × <span class="t2">prereq_depth(c)</span> × (1 − <span class="t3">mastery(c)</span>)
-  </div>
-  <div class="grid g3" style="margin-top:6px">
-    <div class="card lead-accent">
-      <h3 class="am">frequency</h3>
+  <div class="kicker">The application · <b>7,600 lines of Go</b></div>
+  <div class="cols" style="gap:22px;align-items:center">
+    <div style="flex:0 0 690px">
+      <span class="shot"><img src="assets/app.png" alt="The cogdebt desktop window. It shows analogy cards with their limits, a question at level L2, and a cognitive debt panel."></span>
+    </div>
+    <div>
+      <div class="sub" style="font-size:15.5px;color:var(--fg);line-height:1.5">
+        Left: the analogies. Every row shows its limit.<br><br>
+        Right: <span class="am">cognitive debt</span> above <span class="gr">mastery</span>.
+        These are two different scales, so the panel draws two separate groups.
+      </div>
+      <div class="rule"></div>
+      <h3>The application runs on your computer</h3>
       <div class="sub" style="font-size:15px;margin-top:8px">
-        How much you actually lean on it. Not self-report —
-        we scan your public repositories and read it off your real work.
+        This is a proof of concept, so we did not build accounts or sessions. Your profile, your
+        mastery and your analogies are one SQLite file on your disk.
+      </div>
+      <div class="tiny" style="margin-top:10px">
+        There is also a second reason. A list of the subjects you do not know is private information.
       </div>
     </div>
-    <div class="card lead-green">
-      <h3 class="gr">prereq_depth</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">
-        How much else rests on it. A shaky foundation costs more than
-        a shaky leaf.
-      </div>
-    </div>
-    <div class="card lead-warn">
-      <h3 class="wn">1 − mastery</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">
-        How little of it you hold — moved only by answers you actually gave,
-        and damped so one lucky reply proves nothing.
-      </div>
-    </div>
-  </div>
-  <div class="grow"></div>
-  <div class="lead">
-    Self-reported skills are flattering. <strong>A repository scan is not.</strong>
-    That is what turns “I feel rusty” into a ranked list of what to fix first.
   </div>
   <aside class="notes">
-The GitHub scan is the bit that makes this honest. Everyone over-rates themselves;
-your commits do not. That's the input the formula was missing until we wired the scanner.
+Twenty seconds. Let the audience look at the window.
+Then answer the question before they ask it: why is this not a web application.
   </aside>
 </section>
 
 <!-- 9 ------------------------------------------------------------------ -->
 <section class="slide">
-  <div class="kicker">The core mechanic · <b>match on role, not on name</b></div>
-  <h2>Not “both have a controller”.</h2>
-  <div style="height:18px"></div>
-  <div class="lead" style="font-size:23px;margin-bottom:22px">
-    “Both are the single source of truth that everything else reconciles against.”
-    That is a <strong>structural role</strong> — and it is what produces a mapping worth having.
-  </div>
-  <div class="pair">
-    <div class="map">etcd <span class="to">maps to</span> <span class="tg">feature store</span></div>
-    <div class="role">shared role · source_of_truth</div>
-    <div class="br"><b>⚠ </b>etcd is small and strongly consistent. A feature store is a materialized view
-      over dirty events, split into an offline and an online path. Point-in-time correctness is an
-      invariant etcd never had.</div>
-  </div>
-  <div class="pair">
-    <div class="map">liveness probe <span class="to">maps to</span> <span class="tg">drift detection</span></div>
-    <div class="role">shared role · degradation_signal</div>
-    <div class="br"><b>⚠ </b>A probe is cheap, binary and contemporaneous. Labels arrive late, incomplete
-      and biased — drift can look healthy while the business metric dies.</div>
+  <div class="kicker">Architecture · <b>one seam, three methods</b></div>
+  <div class="cols" style="gap:22px;align-items:flex-start">
+    <div>
+      <div class="layer"><span class="nm">Fyne shell</span><span class="ds">the window and the renderer</span></div>
+      <div class="layer"><span class="nm">Google ADK</span><span class="ds">runner, tutor agent, sub-agents, one model for each agent</span></div>
+      <div class="layer seam"><span class="nm am">ext.Registry</span><span class="ds">implements ADK's <span class="mono">tool.Toolset</span>. ADK requests the tool list on <em>every turn</em>, so a plugin can start or stop without a restart</span></div>
+      <div class="layer"><span class="nm">Transports</span><span class="ds">in the same process, or in a separate process over <span class="mono">go-plugin</span></span></div>
+      <div class="layer pure"><span class="nm gr">internal/domain</span><span class="ds">concepts, mastery, the ladder, the debt formula. It imports nothing from this project, so you can test it without a key, a network or a GUI</span></div>
+      <div style="height:12px"></div>
+      <pre><span class="kw">type</span> Extension <span class="kw">interface</span> {
+    Manifest() Manifest
+    Invoke(ctx, tool <span class="kw">string</span>, in json.RawMessage) (json.RawMessage, <span class="kw">error</span>)
+    Close() <span class="kw">error</span>
+}  <span class="c">// only bytes cross this boundary</span></pre>
+    </div>
+    <div style="flex:0 0 392px">
+      <table>
+        <tr><th>plugin</th><th>kind</th><th>function</th></tr>
+        <tr><td class="k">profile</td><td class="m">profile</td><td class="m">skills, mastery, analogies</td></tr>
+        <tr><td class="k">assessor</td><td class="m">assessor</td><td class="m">selects concept and level</td></tr>
+        <tr><td class="k am">analogy</td><td class="m">agent</td><td class="m">a sub-agent, declared in JSON</td></tr>
+        <tr><td class="k">github</td><td class="m">retrieval</td><td class="m">repository scan</td></tr>
+        <tr><td class="k">exa</td><td class="m">retrieval</td><td class="m">find a source</td></tr>
+        <tr><td class="k">firecrawl</td><td class="m">retrieval</td><td class="m">read a page</td></tr>
+        <tr><td class="k">fal</td><td class="m">retrieval</td><td class="m">draw the analogy</td></tr>
+        <tr><td class="k">daytona</td><td class="m">assessor</td><td class="m">run and grade code</td></tr>
+      </table>
+      <div class="grid g3" style="margin-top:14px;gap:10px">
+        <div class="stat"><div class="n am">8</div><div class="l">plugins</div></div>
+        <div class="stat"><div class="n gr">3</div><div class="l">ABI methods</div></div>
+        <div class="stat"><div class="n">0</div><div class="l">cgo in the database</div></div>
+      </div>
+      <div class="tiny" style="margin-top:12px">
+        The same plugin runs in the host process or in a separate process. The plugin code does not change.
+      </div>
+    </div>
   </div>
   <aside class="notes">
-Real output. Point at the orange line, not the top line —
-the top line is what any chatbot gives you. The orange line is the product.
+One sentence matters here: our registry IS the ADK toolset, and ADK asks it again on every turn.
+So a new API key in Settings gives the model a new tool on the next message, with no restart.
   </aside>
 </section>
 
 <!-- 10 ----------------------------------------------------------------- -->
 <section class="slide">
-  <div class="kicker">The one invariant</div>
-  <h2>An analogy with no stated limit</h2>
-  <h2 class="wn">does not pay down cognitive debt. It creates more.</h2>
-  <div style="height:28px"></div>
-  <div class="lead">
-    Give someone a mapping and stop there, and they will carry the borrowed
-    intuition straight past the point where it holds — and they will be
-    <em>confident</em> while doing it. That is the failure mode of every
-    “X is just Y” explanation ever given.
-  </div>
-  <div style="height:24px"></div>
-  <pre><span class="c">// internal/domain — the pure core, enforced in code</span>
-<span class="kw">func</span> (m Mapping) Valid() error {
-    <span class="kw">if</span> len(m.Breakdown) == 0 {
-        <span class="kw">return</span> errors.New(<span class="st">"a mapping with no breakdown creates debt instead of paying it"</span>)
-    }
-    ...
-}</pre>
-  <div class="grow"></div>
-  <div class="tiny">
-    It is a required field on the domain type, a required field in the plugin schema, and a test asserts
-    the agent's instruction still demands it. Three places, because this is the product.
-  </div>
-  <aside class="notes">
-This is the slide to slow down on. Everyone in the room has been given a bad analogy
-that they then over-applied. We made the limit mandatory at the type level.
-  </aside>
-</section>
-
-<!-- 11 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Extraction, not explanation</div>
-  <h2>Four rungs, chosen by code — never by the model.</h2>
-  <div style="height:18px"></div>
-  <div class="rung"><span class="lv am">L1</span><div><div class="nm">What maps to what</div>
-    <div class="ds">Name the thing in the new field that plays the role you already know.</div></div></div>
-  <div class="rung l2"><span class="lv wn">L2</span><div><div class="nm">Where the analogy breaks <span class="tiny wn">← the rung that does the teaching</span></div>
-    <div class="ds">Find the seam yourself. We do not name it for you — being told is not the same as noticing.</div></div></div>
-  <div class="rung"><span class="lv gr">L3</span><div><div class="nm">On its own terms</div>
-    <div class="ds">Answer in the target field's vocabulary, with no analogy left to lean on.</div></div></div>
-  <div class="rung"><span class="lv gr">L4</span><div><div class="nm">Put it together</div>
-    <div class="ds">A small real problem needing two or three target concepts at once — graded by running it.</div></div></div>
-  <div class="grow"></div>
-  <div class="card lead-accent">
-    <div class="sub" style="color:var(--fg);font-size:17px">
-      <strong>Which concept, and which rung, is deterministic domain logic</strong> — driven by debt and
-      measured mastery. Only the <em>wording</em> of the question is left to the model. A model asked to
-      pick the difficulty <em>and</em> judge the answer drifts toward whatever it just explained.
-    </div>
-  </div>
-  <aside class="notes">
-This is the design decision I'm proudest of. The LLM writes sentences.
-It does not get to decide whether you passed, or what comes next. That's code, and it's testable.
-  </aside>
-</section>
-
-<!-- 12 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Happy path <b>A</b> · infrastructure engineer → ML platform</div>
-  <div class="cols" style="gap:22px">
-    <div style="flex:0 0 300px">
-      <div class="card" style="margin-bottom:10px">
-        <div class="tiny" style="margin-bottom:6px">1 · THE LEARNER SAYS</div>
-        <div style="font-size:15px;line-height:1.4">“I know Kubernetes, Go and distributed systems. I want to learn ML pipelines.”</div>
-      </div>
-      <div class="card" style="margin-bottom:10px">
-        <div class="tiny" style="margin-bottom:6px">2 · THE SYSTEM DOES</div>
-        <div class="mono" style="font-size:12.5px;line-height:1.8;color:var(--muted)">
-          profile_upsert<br>github_scan<br>profile_set_frequency<br><span class="am">analogy</span> <span style="font-size:11px">(sub-agent)</span><br>assessor_next → assessor_ask
-        </div>
-      </div>
-      <div class="card lead-green">
-        <div class="tiny" style="margin-bottom:6px">3 · WHAT MOVES</div>
-        <div style="font-size:14px;line-height:1.45">Debt on <span class="mono">point-in-time correctness</span> shows up at <span class="am mono">1.4</span> — a thing they lean on and do not hold.</div>
-      </div>
-    </div>
-    <div>
-      <div class="pair">
-        <div class="map">rolling update <span class="to">maps to</span> <span class="tg">promotion in the model registry</span></div>
-        <div class="role">shared role · rollback</div>
-        <div class="br"><b>⚠ </b>Rolling back a Deployment restores a deterministic binary. Rolling back a model does
-          <strong>not</strong> restore the data distribution it was trained on — v[n−1] can be just as wrong.</div>
-      </div>
-      <div class="card lead-accent" style="margin-top:14px">
-        <div class="tiny" style="margin-bottom:8px">L2 · WHERE THE ANALOGY BREAKS</div>
-        <div style="font-size:17px;font-weight:700;line-height:1.35">
-          “You said a model registry is etcd for models. Where does that analogy stop working?”
-        </div>
-      </div>
-    </div>
-  </div>
-  <aside class="notes">
-Walk the left column top to bottom — that's the loop.
-Then the right: this is what they see. The question is generated from the mapping they just got,
-and it attacks the mapping instead of confirming it.
-  </aside>
-</section>
-
-<!-- 13 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Happy path <b>B</b> · backend engineer → thermodynamics <span class="mu">— real output, grok-4.6</span></div>
+  <div class="kicker">Partner technologies · <b>6 of 10</b></div>
   <div class="cols" style="gap:22px;align-items:flex-start">
     <div>
-      <div class="pair">
-        <div class="map">rate limiting <span class="to">maps to</span> <span class="tg">entropy</span></div>
-        <div class="role">shared role · quota on allowed configurations</div>
-        <div class="br"><b>⚠ </b>A rate limit is a policy you can raise. Entropy is the count of accessible
-          microstates — you cannot add more without changing the physics.</div>
-      </div>
-      <div class="pair">
-        <div class="map">backpressure <span class="to">maps to</span> <span class="tg">irreversibility</span></div>
-        <div class="role">shared role · degradation_signal</div>
-        <div class="br"><b>⚠ </b>Backpressure can be relieved and the queue drained. Thermodynamic irreversibility
-          cannot be undone without paying extra elsewhere.</div>
-      </div>
-    </div>
-    <div style="flex:0 0 330px">
-      <div class="card" style="padding:14px">
-        <div class="tiny" style="margin-bottom:10px">GENERATED ON DEMAND · <span class="am">fal.ai</span></div>
-        <svg viewBox="0 0 300 168" style="width:100%;display:block">
-          <rect x="0" y="0" width="300" height="168" fill="#14161A"/>
-          <rect x="18" y="54" width="98" height="58" fill="none" stroke="#E8A33D" stroke-width="1.2"/>
-          <rect x="184" y="54" width="98" height="58" fill="none" stroke="#E8A33D" stroke-width="1.2"/>
-          <text x="67" y="80" fill="#E8A33D" font-size="11" text-anchor="middle" font-family="monospace">rate</text>
-          <text x="67" y="94" fill="#E8A33D" font-size="11" text-anchor="middle" font-family="monospace">limiting</text>
-          <text x="233" y="88" fill="#E8A33D" font-size="11" text-anchor="middle" font-family="monospace">entropy</text>
-          <line x1="116" y1="83" x2="146" y2="83" stroke="#E8A33D" stroke-width="1.2"/>
-          <line x1="158" y1="83" x2="184" y2="83" stroke="#E8A33D" stroke-width="1.2"/>
-          <path d="M144 74 l10 18 h-20 z" fill="none" stroke="#E8834A" stroke-width="1.2"/>
-          <text x="150" y="90" fill="#E8834A" font-size="9" text-anchor="middle" font-family="monospace">!</text>
-          <text x="150" y="132" fill="#8C93A1" font-size="9" text-anchor="middle" font-family="monospace">the gap is the breakdown</text>
-        </svg>
-      </div>
-      <div class="tiny" style="margin-top:12px">
-        The learner said “I think in pictures”, so the tutor called the image plugin for the single
-        pair carrying the most weight. The picture is drawn <em>around the seam</em>, not around the match.
-      </div>
-    </div>
-  </div>
-  <aside class="notes">
-This one is verbatim from a live run — I did not write these sentences, grok did,
-inside our structure-mapping agent. Note it maps a quota onto a count of microstates.
-That's a role match, and it's a good one.
-  </aside>
-</section>
-
-<!-- 14 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Happy path <b>C</b> · data engineer → dynamic programming</div>
-  <h2>The one grade that is not an opinion.</h2>
-  <div style="height:18px"></div>
-  <div class="cols" style="gap:22px;align-items:flex-start">
-    <div>
-      <div class="pair" style="margin-bottom:12px">
-        <div class="map">SQL window functions <span class="to">maps to</span> <span class="tg">recurrence relation</span></div>
-        <div class="role">shared role · value defined from a window of prior values</div>
-        <div class="br"><b>⚠ </b>A window computes in one linear pass with no backtracking. A recurrence may branch and
-          recompute the same state until memoisation is added.</div>
-      </div>
-      <div class="sub" style="font-size:16px">
-        The learner believed: <em class="wn">“put <span class="mono">@lru_cache</span> on any recursion and it's DP.”</em>
-        Prose grading would have let that pass. A test does not.
-      </div>
-    </div>
-    <div style="flex:0 0 420px">
-      <pre style="font-size:12.5px"><span class="c"># run in a Daytona sandbox, not on the laptop</span>
-<span class="kw">passed</span>=1  <span class="kw">failed</span>=1  <span class="c">in 2252ms</span>
-
-<span class="wn">FAIL</span> is point-in-time correct
-  AssertionError: <span class="st">used a value from the future</span></pre>
-      <div class="card lead-warn" style="margin-top:14px">
-        <div style="font-size:16px;line-height:1.4">
-          A failing test <strong>names the misconception</strong> — already worded
-          for the ledger, better than the tutor could have worded it.
-        </div>
-      </div>
-    </div>
-  </div>
-  <aside class="notes">
-This is where Daytona earns its place. A model scoring prose drifts toward whatever it just explained.
-An assertion doesn't. And the test name is the misconception, in the learner's own problem domain.
-  </aside>
-</section>
-
-<!-- 15 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">It is real software · <b>7,600 lines of Go</b></div>
-  <a class="shot" href="#"><img src="assets/app.png" alt="cogdebt desktop window: analogy cards with breakdowns, a question at L2, and a cognitive-debt panel"></a>
-  <div class="grow"></div>
-  <div class="tiny">
-    Fyne desktop shell. Left: the analogy table, every row carrying its breakdown. Right:
-    <span class="am">cognitive debt</span> above <span class="gr">mastery</span> — two different scales,
-    drawn as two different groups, because conflating them was a real bug we shipped and caught.
-  </div>
-  <aside class="notes">
-Twenty seconds. Let them look. Point at the orange panel on the right —
-that's the debt formula rendered, and the numbers come from the GitHub scan.
-  </aside>
-</section>
-
-<!-- 16 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Architecture</div>
-  <div class="layer"><span class="nm">Fyne shell</span><span class="ds">window, <span class="mono">ViewSpec</span> renderer, one <span class="mono">fyne.Do</span> bridge — widgets never cross a goroutine boundary anywhere else</span></div>
-  <div class="arrow">↓</div>
-  <div class="layer"><span class="nm">Google ADK</span><span class="ds">runner, root tutor agent, sub-agents; per-agent model choice</span></div>
-  <div class="arrow">↓</div>
-  <div class="layer seam"><span class="nm am">ext.Registry</span><span class="ds">implements ADK's <span class="mono">tool.Toolset</span> — <strong>the only seam.</strong> ADK asks for the tool list on <em>every turn</em>, so plugins appear and disappear with no restart</span></div>
-  <div class="arrow">↓</div>
-  <div class="layer"><span class="nm">Transports</span><span class="ds">in-process · out-of-process over <span class="mono">go-plugin</span> — a plugin binary dropped into <span class="mono">plugins/</span> silently replaces its built-in twin</span></div>
-  <div class="arrow">↓</div>
-  <div class="layer pure"><span class="nm gr">internal/domain</span><span class="ds">concepts, roles, mastery, the ladder, the debt formula — <strong>imports nothing from this project.</strong> No ADK, no Fyne, no plugins. Testable with no key, no network, no GUI</span></div>
-  <div class="grow"></div>
-  <div class="grid g3">
-    <div class="stat"><div class="n am">8</div><div class="l">plugins across 4 kinds: profile, retrieval, assessor, agent</div></div>
-    <div class="stat"><div class="n gr">3</div><div class="l">methods in the entire plugin ABI</div></div>
-    <div class="stat"><div class="n">0</div><div class="l">cgo in the database — <span class="mono">modernc.org/sqlite</span>, pure Go</div></div>
-  </div>
-  <aside class="notes">
-The one line that matters: the registry IS the toolset, and ADK re-asks every turn.
-That's why adding an API key in Settings turns a plugin on mid-conversation with no restart.
-We got hot-reload for free out of a design decision we made for a different reason.
-  </aside>
-</section>
-
-<!-- 17 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">The plugin ABI · <b>the whole contract</b></div>
-  <div class="cols" style="gap:24px;align-items:flex-start">
-    <div>
-      <pre style="font-size:13px"><span class="kw">type</span> Extension <span class="kw">interface</span> {
-    Manifest() Manifest
-    Invoke(ctx, tool <span class="kw">string</span>,
-           in json.RawMessage)
-           (json.RawMessage, <span class="kw">error</span>)
-    Close() <span class="kw">error</span>
-}</pre>
-      <div class="sub" style="font-size:16px;margin-top:16px">
-        <strong>Only bytes cross it.</strong> No pointers, no channels, no
-        <span class="mono">*sql.DB</span>, no <span class="mono">fyne.CanvasObject</span> —
-        which is exactly why the same plugin runs in-process or in its own OS process
-        with no code change.
-      </div>
-      <div class="tiny" style="margin-top:14px">
-        A plugin never calls another plugin. It declares what it <span class="mono">Requires</span>;
-        the host resolves. The call graph stays flat.
-      </div>
-    </div>
-    <div style="flex:0 0 470px">
-      <table>
-        <tr><th>plugin</th><th>kind</th><th>what it adds</th></tr>
-        <tr><td class="k">profile</td><td class="m">profile</td><td class="m">skills, mastery, saved analogies</td></tr>
-        <tr><td class="k">assessor</td><td class="m">assessor</td><td class="m">picks the concept and the rung</td></tr>
-        <tr><td class="k am">analogy</td><td class="m">agent</td><td class="m">a whole sub-agent, declared — no Go logic</td></tr>
-        <tr><td class="k">github</td><td class="m">retrieval</td><td class="m">repo scan → real frequency</td></tr>
-        <tr><td class="k">exa</td><td class="m">retrieval</td><td class="m">find sources by meaning</td></tr>
-        <tr><td class="k">firecrawl</td><td class="m">retrieval</td><td class="m">read a page as markdown</td></tr>
-        <tr><td class="k">fal</td><td class="m">retrieval</td><td class="m">draw the mapping</td></tr>
-        <tr><td class="k">daytona</td><td class="m">assessor</td><td class="m">run the code, grade on the result</td></tr>
+      <table style="font-size:13.5px">
+        <tr><th style="width:88px">partner</th><th>function in cogdebt</th></tr>
+        <tr><td class="k am">x.ai</td><td><span class="mono">grok-4.6</span> runs the tutor. The analogy agent runs a non-reasoning model.</td></tr>
+        <tr><td class="k am">Daytona</td><td>Executes the learner's code against the tests. This produces the L4 grade.</td></tr>
+        <tr><td class="k am">fal.ai</td><td>Draws the analogy when the learner asks for a picture.</td></tr>
+        <tr><td class="k am">Exa</td><td>Finds a source when the tutor has no URL.</td></tr>
+        <tr><td class="k am">Firecrawl</td><td>Reads that source as clean markdown.</td></tr>
+        <tr><td class="k am">Render</td><td>Serves these slides from the same repository.</td></tr>
       </table>
-      <div class="tiny" style="margin-top:12px">
-        <span class="am">analogy</span> is the interesting one: it does not implement an agent,
-        it <em>describes</em> one. A new specialist costs one manifest and zero Go.
+      <div class="tiny" style="margin-top:11px">
+        We did not use <span class="chip off">Convex</span> <span class="chip off">Wonder</span>
+        <span class="chip off">Wispr&nbsp;Flow</span>. Convex stores state on a server, and we keep state on
+        the learner's disk. A Go desktop application has no React handoff. And we typed instead of speaking.
       </div>
     </div>
-  </div>
-  <aside class="notes">
-If a judge is technical, this is the slide they'll ask about. Three methods, bytes only.
-And the analogy plugin is a JSON description of an agent — swap the instruction, swap the teaching strategy,
-no recompile.
-  </aside>
-</section>
-
-<!-- 18 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Why a local desktop app</div>
-  <h2>Because this is a proof of concept, and auth is not the point.</h2>
-  <div style="height:24px"></div>
-  <div class="grid g2">
-    <div class="card lead-green">
-      <h3>What we bought</h3>
-      <div class="sub" style="font-size:15.5px;margin-top:10px;line-height:1.5">
-        No accounts, no sessions, no tenancy, no cloud bill. Your profile, your
-        mastery and your analogies are one SQLite file on your own disk.
-        Your unflattering skill assessment never leaves the laptop.
+    <div style="flex:0 0 392px">
+      <div class="card lead-green">
+        <div class="tiny" style="margin-bottom:9px">MEASURED DURING THE BUILD</div>
+        <div class="cols" style="gap:11px">
+          <div class="stat" style="padding:12px"><div class="n">120s</div><div class="l">one turn, before</div></div>
+          <div class="stat" style="padding:12px"><div class="n gr">34s</div><div class="l">one turn, after</div></div>
+        </div>
+        <div class="sub" style="font-size:14px;margin-top:11px;line-height:1.45">
+          We changed one field: the model of each agent. An agent that follows written steps does not
+          need a reasoning model. An agent that decides the next action does need one. Tracing found this.
+        </div>
+      </div>
+      <div style="height:14px"></div>
+      <h3>Next</h3>
+      <div class="sub" style="font-size:15px;margin-top:7px;line-height:1.45">
+        Ask the learner to predict the match before the system shows it. Show their answer next to the
+        correct answer. Keep a list of every wrong belief, and ask about it again later.
+      </div>
+      <div class="tiny" style="margin-top:11px">
+        Then build a shared debt list for a team. Cognitive debt is not only an individual problem.
+        It is also what happens when the one engineer who understood a service leaves the company.
       </div>
     </div>
-    <div class="card">
-      <h3>What we deferred</h3>
-      <div class="sub" style="font-size:15.5px;margin-top:10px;line-height:1.5">
-        Sync, teams, a shared debt ledger for a whole org. All of it is a
-        transport change behind the same ABI — the domain layer already
-        knows nothing about where it runs.
-      </div>
-    </div>
-  </div>
-  <div style="height:22px"></div>
-  <div class="lead">
-    The honest version: we spent the hackathon on the <strong>teaching loop</strong>,
-    because that is the part nobody has solved. Login screens are solved.
-  </div>
-  <aside class="notes">
-Judges always ask "why not a web app". Answer it before they do, and say the real reason:
-we'd rather spend the time on the thing that's hard. And the privacy angle is genuine —
-a list of what you don't know is not something you want on someone else's server.
-  </aside>
-</section>
-
-<!-- 19 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Partner stack · <b>6 of 10, each doing real work</b></div>
-  <table style="font-size:15px">
-    <tr><th style="width:112px">partner</th><th style="width:112px">area</th><th>what it actually does in cogdebt</th></tr>
-    <tr><td class="k am">x.ai</td><td class="m">API / models</td><td><span class="mono">grok-4.6</span> runs the tutor. The analogy sub-agent runs <span class="mono">grok-4.20-non-reasoning</span> — it follows a written procedure, so reasoning tokens bought nothing and cost most of the turn.</td></tr>
-    <tr><td class="k am">Daytona</td><td class="m">AI sandboxes</td><td>The learner's solution runs against tests the tutor wrote. This is the only grade in the system that is not an opinion.</td></tr>
-    <tr><td class="k am">fal.ai</td><td class="m">Generate / media</td><td>Draws a mapping when the learner says they think visually — with the breakdown drawn as a break in the diagram.</td></tr>
-    <tr><td class="k am">Exa</td><td class="m">Search / web</td><td>Finds a source by meaning when the tutor has no URL — used where the model's own recall is not trustworthy.</td></tr>
-    <tr><td class="k am">Firecrawl</td><td class="m">Research / web data</td><td>Turns that source into clean markdown so the answer is grounded in a page, not in a memory.</td></tr>
-    <tr><td class="k am">Render</td><td class="m">Host / infra</td><td>Serves this deck, straight from <span class="mono">presentation/</span> on master.</td></tr>
-    <tr><td class="k mu">Grok Bot</td><td class="m">Editor</td><td class="m">Built in it.</td></tr>
-  </table>
-  <div class="grow"></div>
-  <div class="tiny">
-    Not used, and we would rather say so: <span class="chip off">Convex</span>
-    <span class="chip off">Wonder</span> <span class="chip off">Wispr Flow</span> —
-    Convex because the whole point was to keep state on the learner's own disk; the other two
-    because a Fyne desktop app has no React handoff and we were typing, not talking.
-  </div>
-  <aside class="notes">
-Be precise here — judges check. Six partners, each with a real job, not a logo.
-And name the three we skipped with the reason. Saying "we didn't need Convex because local-first"
-is a stronger answer than pretending we used it.
-  </aside>
-</section>
-
-<!-- 20 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">What we measured while building it</div>
-  <h2>Per-agent model choice is the biggest lever in an ADK app.</h2>
-  <div style="height:26px"></div>
-  <div class="grid g4">
-    <div class="stat"><div class="n">120s</div><div class="l">a turn, before</div></div>
-    <div class="stat"><div class="n gr">34s</div><div class="l">a turn, after</div></div>
-    <div class="stat"><div class="n">84s</div><div class="l">analogy sub-agent, before</div></div>
-    <div class="stat"><div class="n gr">7.4s</div><div class="l">analogy sub-agent, after</div></div>
-  </div>
-  <div style="height:24px"></div>
-  <div class="lead">
-    We only found it because every seam is traced with timings. The sub-agent was burning
-    <strong>4,069 tokens over 74 seconds</strong> on an instruction that asked for three short pairs —
-    all of it reasoning, none of it visible, none of it useful.
-  </div>
-  <div class="grow"></div>
-  <div class="card lead-accent">
-    <div class="sub" style="color:var(--fg);font-size:17px">
-      An agent that <em>follows</em> a written procedure does not want a reasoning model.
-      An agent that <em>decides what to do next</em> does. Ours are configured separately, per plugin,
-      as one field in a manifest.
-    </div>
-  </div>
-  <aside class="notes">
-This is our "we actually engineered this" slide. 3.5x on the whole turn from one config field,
-found by tracing rather than guessing. If you have 20 seconds left, say the last sentence.
-  </aside>
-</section>
-
-<!-- 21 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">The team</div>
-  <div style="height:8px"></div>
-  <div class="grid g2" style="gap:26px">
-    <div class="card person">
-      <div class="avatar" data-photo="assets/sirius.jpg"><span>S</span></div>
-      <div>
-        <h3 style="font-size:24px">Sirius</h3>
-        <div class="sub" style="font-size:16px;margin-top:4px">Team Lead, <strong>Nebius</strong></div>
-        <div class="tiny" style="margin-top:8px">Runs <span class="mono am">digest.siriusfrk.ru</span> — the 8,864-story Hacker News archive this deck's evidence came from.</div>
-      </div>
-    </div>
-    <div class="card person">
-      <div class="avatar" data-photo="assets/danila.jpg"><span>D</span></div>
-      <div>
-        <h3 style="font-size:24px">Danila</h3>
-        <div class="sub" style="font-size:16px;margin-top:4px">Senior Go Developer, <strong>Group-IB</strong></div>
-        <div class="tiny" style="margin-top:8px">The plugin ABI, the transports, and the reason a bad plugin cannot take the host down.</div>
-      </div>
-    </div>
-  </div>
-  <div class="grow"></div>
-  <div class="lead">
-    We picked this problem because it is ours. We have both watched good engineers
-    get faster and less sure at the same time.
-  </div>
-  <aside class="notes">
-Keep it to two sentences each. The digest line is worth saying — it explains why our
-problem slides are evidence rather than vibes.
-  </aside>
-</section>
-
-<!-- 22 ----------------------------------------------------------------- -->
-<section class="slide">
-  <div class="kicker">Where it goes</div>
-  <h2>Stop explaining. Start extracting.</h2>
-  <div style="height:22px"></div>
-  <div class="grid g3">
-    <div class="card lead-accent">
-      <h3>Predict before reveal</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">Hide the target. Make them guess the mapping first — the guess is the measurement.</div>
-    </div>
-    <div class="card lead-accent">
-      <h3>Contrast</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">Show their answer beside the real one. The gap teaches more than the answer does.</div>
-    </div>
-    <div class="card lead-accent">
-      <h3>The misconception ledger</h3>
-      <div class="sub" style="font-size:15px;margin-top:8px">Every failed test and missed seam, written down and scheduled to come back.</div>
-    </div>
-  </div>
-  <div style="height:26px"></div>
-  <div class="sub">
-    Designed and drawn already, in <span class="mono">design/</span>, with a test asserting the
-    screens still match the app's own palette and rules. Next after that: a team-wide debt ledger —
-    because cognitive debt is not an individual problem, it is what happens when the only person
-    who understood the service leaves.
   </div>
   <div class="grow"></div>
   <div class="rule"></div>
   <div class="cols" style="align-items:center">
-    <div class="wordmark" style="font-size:44px">cogdebt<span class="dot">.</span></div>
+    <div class="wordmark" style="font-size:40px">cogdebt<span class="dot">.</span></div>
     <div class="tiny" style="text-align:right">
-      Learn a new field through the one you already hold.<br>
-      <span class="mu">Go · plugin ABI · Google ADK · local-first · MIT</span>
+      Learn a new subject through a subject you already know.<br>
+      <span class="mu">Go · plugin ABI · Google ADK · local application · MIT</span>
     </div>
   </div>
   <aside class="notes">
-Land on the last line: cognitive debt is not an individual problem.
-It's a bus-factor problem, and that's the version a company pays for.
-Then stop talking.
+Name six partners with one function each. Then name the three we did not use, with the reason.
+Judges check this. Finish on the last sentence about the engineer who leaves. Then stop talking.
   </aside>
 </section>
 
@@ -921,8 +583,8 @@ Then stop talking.
   var help = document.getElementById('help');
   var i = 0, notesOn = false;
 
-  // The stage is authored at a fixed 1280x720 and scaled to whatever it is
-  // projected onto, so a layout that fits here fits everywhere.
+  // The stage has a fixed size of 1280x720. We scale it to the screen, so a
+  // layout that fits here also fits on every projector.
   function fit() {
     var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
     stage.style.transform = 'scale(' + s + ')';
@@ -959,27 +621,16 @@ Then stop talking.
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen(); break;
       default:
-        if (/^[0-9]$/.test(e.key)) { var d = parseInt(e.key, 10); if (d >= 1) show(d - 1); }
+        // Keys 1 to 9 select a slide. Key 0 selects slide 10, the last slide.
+        if (/^[0-9]$/.test(e.key)) { var d = parseInt(e.key, 10); show(d === 0 ? 9 : d - 1); }
     }
   });
 
-  // Click the right half to advance, the left half to go back. A remote
-  // clicker sends arrow keys, so both paths land in the same place.
+  // A click on the right half goes forward. A click on the left half goes back.
+  // A presenter remote sends arrow keys, so both methods do the same thing.
   document.addEventListener('click', function (e) {
     if (e.target.closest('#notes') || e.target.closest('a')) return;
     show(e.clientX > window.innerWidth / 2 ? i + 1 : i - 1);
-  });
-
-  // Photos are optional: a missing file leaves the monogram in place rather
-  // than a broken-image icon, so the deck is presentable before they land.
-  Array.prototype.forEach.call(document.querySelectorAll('.avatar[data-photo]'), function (el) {
-    var src = el.getAttribute('data-photo');
-    var probe = new Image();
-    probe.onload = function () {
-      el.style.backgroundImage = 'url("' + src + '")';
-      el.classList.add('has-photo');
-    };
-    probe.src = src;
   });
 
   window.addEventListener('resize', fit);

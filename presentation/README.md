@@ -10,13 +10,17 @@ Plain static HTML — no build step, no dependencies, no CDN. Open
 | key | |
 |---|---|
 | `→` `←` `space` | next / previous slide (a presenter clicker sends these) |
-| `1`–`9` | jump to a slide |
+| `1`–`9`, `0` | jump to a slide (`0` is slide 10) |
 | `N` | speaker notes for the current slide |
 | `F` | fullscreen |
 | click | right half forward, left half back |
 
-The slide number is in the URL hash, so `index.html#14` opens on slide 14 — use
-it to jump straight to a happy path when a judge asks.
+The slide number is in the URL hash, so `index.html#7` opens on slide 7. Use it
+to go straight to the examples when a judge asks for one.
+
+Ten slides, five minutes. The text uses Simple Technical English: short
+sentences, one idea in each sentence, active voice, and no idioms. The audience
+is international, and a projector is a bad place for a long sentence.
 
 **Printing gives you a PDF.** Every slide becomes one landscape page. Do this
 before you present: a laptop that will not talk to the projector is the most
@@ -28,8 +32,6 @@ likely thing to go wrong, and a PDF on a phone still gets you through the pitch.
 index.html        the deck — markup, styles and navigation in one file
 SPEECH.md         what to say, one numbered section per slide
 assets/app.png    screenshot of the running app, used on the demo slide
-assets/           drop sirius.jpg and danila.jpg here for the team slide;
-                  until they exist the slide falls back to monograms
 ```
 
 ## It is checked
@@ -55,8 +57,8 @@ Served by Render as a static site from `master`:
 Pushing to `master` redeploys — Render service `srv-daijib5g1s2s73fjv45g`.
 Nothing here reads an environment variable, and no key is needed to serve it.
 
-Deep-link a slide with the hash: `…onrender.com/#14` opens on the Daytona
-happy path, which is the one judges ask about.
+Deep-link a slide with the hash: `…onrender.com/#7` opens on the examples,
+including the Daytona result that judges ask about.
 
 ## Regenerating the screenshot
 
