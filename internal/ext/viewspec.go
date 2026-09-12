@@ -60,6 +60,29 @@ type AnalogyTableProps struct {
 	Rows []AnalogyRow `json:"rows"`
 }
 
+// The events a view node can emit.
+//
+// An analogy is not a conclusion, it is the place learning starts: every pair
+// is a door, and these are the two ways through it. The host turns an event
+// into the learner's next message, so a pair the learner wants to push on
+// becomes a turn without them having to compose a prompt for it.
+const (
+	// EventSubmit carries a typed answer. Payload: {"answer": "..."}.
+	EventSubmit = "submit"
+	// EventDigDeeper asks for the mapping to be taken further.
+	// Payload: {"source": "...", "target": "..."}.
+	EventDigDeeper = "dig_deeper"
+	// EventAskMe asks to be questioned on this pair instead of told about it.
+	// Payload: {"source": "...", "target": "..."}.
+	EventAskMe = "ask_me"
+)
+
+// PairPayload identifies which analogy an event is about.
+type PairPayload struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
 // ImageProps is a picture fetched from a URL.
 //
 // The bytes deliberately do not cross the ABI. An image generator answers with

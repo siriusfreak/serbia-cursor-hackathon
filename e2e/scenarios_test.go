@@ -12,6 +12,11 @@ import (
 
 func init() { app.LoadDotEnv("../.env") }
 
+// The four run concurrently. Each builds its own system on its own temporary
+// database and its own plugin instances, so there is nothing between them to
+// share -- and a suite whose wall time is the slowest scenario rather than the
+// sum of all four is one people will actually run.
+//
 // Four fields, four different reasons to reach for a plugin.
 //
 // The point of spreading the suite across domains is not coverage for its own
@@ -24,6 +29,7 @@ func init() { app.LoadDotEnv("../.env") }
 
 // TestAlgorithms exercises the sandbox: the grade comes from tests that ran.
 func TestAlgorithms(t *testing.T) {
+	t.Parallel()
 	r := e2e.Run(t, e2e.Scenario{
 		Name: "algorithms",
 		Learner: e2e.Learner{
@@ -55,6 +61,7 @@ func TestAlgorithms(t *testing.T) {
 
 // TestBiology exercises retrieval: search by meaning, then read the page.
 func TestBiology(t *testing.T) {
+	t.Parallel()
 	e2e.Run(t, e2e.Scenario{
 		Name: "biology",
 		Learner: e2e.Learner{
@@ -84,6 +91,7 @@ func TestBiology(t *testing.T) {
 
 // TestPhysics exercises generation: the mapping comes back as a picture.
 func TestPhysics(t *testing.T) {
+	t.Parallel()
 	e2e.Run(t, e2e.Scenario{
 		Name: "physics",
 		Learner: e2e.Learner{
@@ -124,6 +132,7 @@ func TestPhysics(t *testing.T) {
 
 // TestDistributedSystems exercises measurement: cognitive debt from real repos.
 func TestDistributedSystems(t *testing.T) {
+	t.Parallel()
 	e2e.Run(t, e2e.Scenario{
 		Name: "distributed-systems",
 		Learner: e2e.Learner{

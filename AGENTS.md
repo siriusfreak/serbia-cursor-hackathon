@@ -18,6 +18,8 @@ go test ./...
 go run ./cmd/cogdebt                            # desktop window
 go run ./cmd/cogdebt -cli -debug                # REPL; every tool call is printed
 go run ./cmd/cogdebt -screenshot /tmp/p.png     # sample content -> PNG -> exit, no model call
+go run ./cmd/cogdebt -demo                      # the scripted 2-minute run: no key, no network
+go run ./cmd/cogdebt -demo -demo-speed 4        # same, four times faster, for checking it
 
 COGDEBT_LIVE=1 go test ./e2e/ -v -timeout 30m   # every scenario, against the real model and services
 COGDEBT_LIVE=1 go test ./e2e/ -run Physics -v   # one of them
@@ -223,6 +225,33 @@ The student uses `COGDEBT_STUDENT_MODEL` (default the non-reasoning model). Do
 not "improve" it to a reasoning model: it is playing a part, not solving the
 problem, and a stronger model quietly stops being the beginner it was asked to
 be.
+
+### The tutor model stays reasoning. This was measured.
+
+A live session showed the root tutor spending 30 seconds and 2000+ output
+tokens per model call to produce one question, while every plugin answered in
+under 7 ms and the analogy sub-agent finished in 7 s. The obvious move was the
+one that already worked for the analogy agent: switch to
+`grok-4.20-0309-non-reasoning`. So it was run across all four scenarios.
+
+| scenario | grok-4.6 | non-reasoning |
+|---|---|---|
+| algorithms | 3m54s, pass | **31s, pass** |
+| distributed-systems | 3m40s, pass | **34s, pass** |
+| physics | 3m10s, pass | 37s, **FAIL** |
+| biology | 4m21s, pass | timed out at 20m, **FAIL** |
+
+Seven times faster and broken. The failure is the same in both: the tutor calls
+`assessor_next`, skips `assessor_ask` entirely, and goes straight to
+`assessor_grade` — which faults, correctly, with "there is no open question to
+grade". The learner is never asked anything. Biology then looped on that until
+the timeout.
+
+So the speed is not free, and `COGDEBT_MODEL` stays on a reasoning model. If you
+want the turn shorter, the honest places to look are the wasted round trips: a
+`profile_save_analogy` rejected for a missing breakdown costs a whole extra
+model call, and the root instruction never tells the tutor that every pair needs
+one.
 
 ### What the first runs found
 
@@ -435,6 +464,42 @@ Two things about the ladder worth knowing before changing it:
 - **`appendToolResult` also knows `fal_illustrate`.** The plugin returns a URL
   and nothing else; the host downloads it. Bytes do not cross the ABI — see the
   note on `ext.ImageProps`.
+
+## The demo is scripted on purpose
+
+`-demo` plays a fixed conversation (`internal/ui/demo_script.go`) through the
+real renderer: same cards, same theme, same ladder. It needs no key, no network
+and no plugins, because a stage is the worst place to learn that one of four
+external services is having a bad minute.
+
+Two things about it are load-bearing:
+
+- **The numbers are the real ones.** Mastery moves 0 -> 0.34 -> 0.56 -> 0.71 ->
+  0.81 and the rungs run L1 L2 L3 L3 L4, because that is what the actual
+  assessor does with five good answers on one concept. Both are pinned by
+  tests, in `exts/assessor` and in `internal/ui/demo_script_test.go`. A demo
+  that showed a prettier climb than the code produces would be a lie told to
+  the people most likely to check.
+- **The learner names ONE skill.** With three, `assessor_next` rotates and no
+  concept ever gathers the mastery L4 needs. That is correct behaviour and a
+  bad demo, so the script does not pretend otherwise.
+
+The diagram is a real fal generation, embedded (`internal/ui/assets/`). The
+labels are the part an image model gets wrong, so one checked picture is worth
+more than a fresh one every run.
+
+## Every analogy is a door
+
+Each row of the analogy table carries **Dig deeper** and **Ask me**. They emit
+`ext.EventDigDeeper` / `ext.EventAskMe` with the pair, and the shell turns that
+into the learner's next message — visible in the feed, in the transcript,
+nothing behind their back. "Ask me" is the more useful of the two: a pair you
+can be questioned on is one you have to hold yourself.
+
+The message is written in the learner's script, chosen by whether they have
+typed Cyrillic. That is crude and it is the whole of what is needed: the tutor
+answers in the language it is addressed in, so an English button emitting
+English prose would silently switch a Russian session over, mid-lesson.
 
 ## Not built yet
 

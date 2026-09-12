@@ -40,6 +40,8 @@ func main() {
 		user    = flag.String("user", "local", "learner id")
 		naive   = flag.Bool("naive", false, "also load the naive analogy plugin, for comparison")
 		cli     = flag.Bool("cli", false, "terminal REPL instead of the desktop window")
+		demo    = flag.Bool("demo", false, "play the scripted happy path: no model, no network, same result every time")
+		speed   = flag.Float64("demo-speed", 1, "playback speed for -demo; 2 is twice as fast")
 		shot    = flag.String("screenshot", "", "save a PNG of the window here and exit")
 		say     = flag.String("say", "", "submit this message on startup, for a scripted live run")
 		openCfg = flag.Bool("open-settings", false, "open the settings dialog on startup, for screenshots")
@@ -60,6 +62,13 @@ func main() {
 		os.Exit(1)
 	}
 	defer closeLog()
+
+	if *demo {
+		// Deliberately before anything that needs a key or a network: the whole
+		// point is a run that cannot fail for a reason outside this binary.
+		runDemo(*speed, *shot, *after)
+		return
+	}
 
 	if err = run(*dbPath, *plugDir, *user, *naive, *cli, *shot, *say, *openCfg, *after, log); err != nil {
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
@@ -114,6 +123,27 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, op
 	}
 	shell.Run()
 	return nil
+}
+
+// runDemo plays the scripted happy path.
+//
+// A live demo depends on a model, a network and four external services, and a
+// stage is the worst place to find out one of them is having a bad minute. Every
+// card here is drawn by the same renderer the live app uses, so the room sees
+// the product rather than a video of it -- only the content is fixed.
+func runDemo(speed float64, shot string, after time.Duration) {
+	shell := ui.New(context.Background(), ui.Config{
+		Model:    "scripted",
+		Scripted: true,
+	})
+	shell.Play(ui.HappyPath(), speed)
+	if shot != "" {
+		if err := shell.RunAndCapture(shot, after); err != nil {
+			fmt.Fprintf(os.Stderr, "screenshot: %v\n", err)
+		}
+		return
+	}
+	shell.Run()
 }
 
 // settingsConfig describes what is configurable and what saving does.
