@@ -31,6 +31,7 @@ const (
 	ViewQuestion     = "question"
 	ViewMastery      = "mastery"
 	ViewImage        = "image"
+	ViewFinding      = "finding"
 )
 
 // StackProps configures a container.
@@ -58,6 +59,26 @@ type AnalogyRow struct {
 // AnalogyTableProps is the analogy table.
 type AnalogyTableProps struct {
 	Rows []AnalogyRow `json:"rows"`
+}
+
+// Citation points at the line in the change that the finding rests on.
+type Citation struct {
+	Path  string `json:"path"`
+	Quote string `json:"quote,omitempty"`
+}
+
+// FindingProps is a review card: what a change promised, set against what its
+// own tests check. It is a separate type from AnalogyTableProps because it
+// says a different kind of thing -- an open question about someone else's
+// code, not knowledge the learner now holds.
+type FindingProps struct {
+	Subject   string     `json:"subject,omitempty"`
+	Title     string     `json:"title,omitempty"`
+	Claim     string     `json:"claim,omitempty"`
+	Observed  string     `json:"observed"`
+	Untested  string     `json:"untested,omitempty"`
+	Citations []Citation `json:"citations,omitempty"`
+	URL       string     `json:"url,omitempty"`
 }
 
 // ImageProps is a picture fetched from a URL.

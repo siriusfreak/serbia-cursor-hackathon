@@ -201,7 +201,7 @@ return ext.JSON(map[string]any{"view": ext.Stack(
 ```
 
 The vocabulary is closed and small: `stack · markdown · analogy_table · question ·
-mastery`. An unknown `type` renders as a placeholder and the window survives — a
+mastery · image · finding`. An unknown `type` renders as a placeholder and the window survives — a
 plugin newer than the host degrades rather than breaks.
 
 Types live in [`internal/ext/viewspec.go`](../internal/ext/viewspec.go), rendering

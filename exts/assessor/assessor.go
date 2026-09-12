@@ -77,7 +77,12 @@ func (e *Ext) Manifest() ext.Manifest {
 					"properties": {
 						"concept": {"type": "string", "description": "Concept from assessor_next"},
 						"level":   {"type": "string", "description": "L1, L2, L3 or L4, from assessor_next"},
-						"prompt":  {"type": "string", "description": "The question, in the learner's language"}
+						"prompt":  {"type": "string", "description": "The question, in the learner's language"},
+						"options": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Optional clickable choices. Prefer three short ones on L1 and L2."
+						}
 					},
 					"required": ["concept", "level", "prompt"]
 				}`),

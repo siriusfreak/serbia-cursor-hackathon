@@ -31,7 +31,10 @@ import (
 	"github.com/sirius/cogdebt/exts/fal"
 	"github.com/sirius/cogdebt/exts/firecrawl"
 	"github.com/sirius/cogdebt/exts/github"
+	"github.com/sirius/cogdebt/exts/oracle"
 	"github.com/sirius/cogdebt/exts/profile"
+	"github.com/sirius/cogdebt/exts/review"
+	"github.com/sirius/cogdebt/exts/vcs"
 	"github.com/sirius/cogdebt/internal/domain"
 	"github.com/sirius/cogdebt/internal/ext"
 	"github.com/sirius/cogdebt/internal/ext/subprocess"
@@ -48,7 +51,12 @@ const RootInstruction = `You help an engineer learn a new field by building on w
 
 Always reply in the language the learner writes in.
 
-The loop:
+If the message contains a pull-request URL, delegate to the review agent and do
+nothing else that turn. Reviewing a change is the same loop read from the other
+end -- what the learner believes about someone else's code -- so it needs no
+profile and no target topic first.
+
+Otherwise, the loop:
 
 1. SKILLS. If you do not know what they know, ask -- then call profile_upsert.
    If they give you a GitHub username, call github_scan and pass its concepts
@@ -238,6 +246,9 @@ func (a *App) loadPlugins() {
 		profile.New(a.Store, a.UserID),
 		assessor.New(a.Store, a.UserID),
 		analogy.New(),
+		vcs.New(),
+		oracle.New(),
+		review.New(),
 	)
 	if !a.Registry.Has("github") {
 		a.Registry.MustLoad(github.New())
