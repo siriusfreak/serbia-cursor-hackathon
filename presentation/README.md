@@ -2,6 +2,8 @@
 
 The cogdebt pitch deck for the Cursor Community Serbia Hackathon.
 
+**Live: https://serbia-cursor-hackathon.onrender.com**
+
 Plain static HTML — no build step, no dependencies, no CDN. Open
 [`index.html`](index.html) in any browser.
 
@@ -50,8 +52,11 @@ Served by Render as a static site from `master`:
 | build command | *(none — there is nothing to build)* |
 | publish directory | `.` |
 
-Pushing to `master` redeploys. Nothing here reads an environment variable, and
-no key is needed to serve it.
+Pushing to `master` redeploys — Render service `srv-daijib5g1s2s73fjv45g`.
+Nothing here reads an environment variable, and no key is needed to serve it.
+
+Deep-link a slide with the hash: `…onrender.com/#14` opens on the Daytona
+happy path, which is the one judges ask about.
 
 ## Regenerating the screenshot
 
