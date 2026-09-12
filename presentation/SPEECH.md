@@ -66,9 +66,9 @@ Point at the Nature line and the Ford line. Do not read the other four.
 > "This is the current market. Disable the AI assistant one day each week. Or
 > type the generated code again by hand, line by line. Or use flashcards.
 >
-> These are three real products, and they are honest attempts. But look at the
-> shape they share. Every one of them removes something: your speed, your tools,
-> or your evening.
+> These are three real techniques, and people use them today. They are honest
+> attempts. But look at the shape they share. Every one of them removes
+> something: your speed, your tools, or your evening.
 >
 > Each one stops new debt. None of them pays back the debt you already have."
 
