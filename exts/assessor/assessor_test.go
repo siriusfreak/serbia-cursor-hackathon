@@ -2,6 +2,7 @@ package assessor_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/sirius/cogdebt/exts/assessor"
@@ -140,4 +141,28 @@ func TestGradeWithoutAnOpenQuestion(t *testing.T) {
 
 func TestAssessorConformance(t *testing.T) {
 	exttest.Conformance(t, newPlugin(t, "backpressure"))
+}
+
+// TestOneConceptClimbsTheWholeLadder documents the happy path, and pins the
+// number of good answers it takes.
+//
+// The learner must name ONE skill for this to work. next() probes whatever the
+// learner holds least well, so with three skills it rotates and no single
+// concept ever reaches the mastery L4 needs — which is correct behaviour, and
+// also why a demo that lists three skills never gets past L2.
+func TestOneConceptClimbsTheWholeLadder(t *testing.T) {
+	e := newPlugin(t, "PostgreSQL")
+
+	var rungs []string
+	for i := 0; i < 6; i++ {
+		concept, level, _ := next(t, e)
+		rungs = append(rungs, level)
+		askAndGrade(t, e, concept, level, 1.0)
+	}
+
+	got := strings.Join(rungs, " ")
+	const want = "L1 L2 L3 L3 L4 L4"
+	if got != want {
+		t.Errorf("a learner answering perfectly climbs %q, want %q", got, want)
+	}
 }
