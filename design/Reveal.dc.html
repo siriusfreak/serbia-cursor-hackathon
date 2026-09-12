@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+  body{margin:0;background:#14161A;color:#E6E8EC;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  a{color:#E8A33D;} a:hover{color:#E8834A;}
+  .wrap{padding:32px;display:flex;flex-direction:column;gap:18px;}
+  .acc{display:flex;gap:10px;align-items:stretch;}
+  .bar{width:3px;border-radius:1.5px;flex:none;}
+  .card{background:#1C1F25;border-radius:8px;padding:18px 20px;flex:1;
+    display:flex;flex-direction:column;gap:14px;}
+  .sec{font-size:12px;font-weight:600;color:#8C93A1;letter-spacing:.09em;}
+  .body{font-size:14px;line-height:1.55;color:#E6E8EC;}
+  .muted{font-size:12px;line-height:1.5;color:#8C93A1;}
+  .brk{font-size:14px;font-style:italic;line-height:1.55;color:#E8A33D;}
+  .row{display:flex;gap:10px;align-items:flex-start;}
+  .mapline{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .src{font-size:14px;font-weight:700;color:#E6E8EC;}
+  .tgt{font-size:14px;font-weight:700;color:#E8A33D;}
+  .lnk{font-size:12px;color:#8C93A1;}
+  .hole{font-size:14px;font-weight:700;color:#8C93A1;border:1px dashed #2C323C;
+    border-radius:8px;padding:5px 20px;letter-spacing:.3em;}
+  .input{background:#242932;border:1px solid #2C323C;border-radius:8px;
+    padding:13px 14px;font-size:14px;line-height:1.5;color:#8C93A1;min-height:56px;}
+  .answered{background:#242932;border-radius:8px;padding:13px 14px;
+    font-size:14px;line-height:1.5;color:#E6E8EC;}
+  .btn{background:#E8A33D;color:#14161A;font-size:14px;font-weight:700;
+    border-radius:8px;padding:11px 0;text-align:center;}
+  .btn2{background:#242932;color:#E6E8EC;font-size:14px;font-weight:600;
+    border:1px solid #2C323C;border-radius:8px;padding:11px 0;text-align:center;}
+  .chip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+    color:#8C93A1;background:#1C1F25;border-radius:9px;padding:4px 10px;
+    display:inline-block;}
+  .lvl{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+    color:#E8A33D;background:#242932;border-radius:9px;padding:4px 10px;}
+  .hr{height:1px;background:#2C323C;}
+
+  </style>
+</helmet>
+<div class="wrap"><div class="acc"><div class="bar" style="background:#4FBF8B"></div><div class="card">
+  <div class="sec">YOU SAID</div>
+  <div class="answered">model registry &mdash; it&rsquo;s where the versioned truth about a model lives</div>
+
+  <div class="hr"></div>
+
+  <div class="sec">THE MAPPING</div>
+  <div class="mapline">
+    <span class="src">etcd</span>
+    <span class="lnk">maps to</span>
+    <span class="tgt">feature store</span>
+  </div>
+  <div class="muted">shared role &middot; source of truth</div>
+
+  <div class="body">Dual writes are split-brain. If the training job and the serving path
+    read different definitions of <span style="color:#E8A33D">user_ltv_30d</span>, you have
+    training-serving skew &mdash; the ML name for two controllers reconciling against
+    different etcds.</div>
+
+  <div class="row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:3px"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div class="muted">This mapping has a limit,
+    and it is the part that matters. You have not seen it yet.</div></div>
+
+  <div class="btn">See where you diverged</div>
+</div></div></div>
+</x-dc>
+</body>
+</html>

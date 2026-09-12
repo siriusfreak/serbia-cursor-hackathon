@@ -39,5 +39,8 @@ go.work.sum
 # Built out-of-process plugin binaries
 /plugins/
 
-# Seeded design canvas (build artifact, ~2MB payload)
-design/*.html
+# Seeded design canvas (build artifact, ~2MB payload).
+# The negation matters: artboards are *.dc.html and must stay tracked.
+/design/*.html
+!/design/*.dc.html
+__pycache__/
