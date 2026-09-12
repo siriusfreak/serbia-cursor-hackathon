@@ -137,6 +137,23 @@ model; the root agent still runs on `COGDEBT_MODEL`.
 `MaxOutputTokens` on the spec is the other half. Prose about length is advice a
 model may ignore.
 
+## The design canvas is checked, not just drawn
+
+`design/` holds one `.dc.html` per artboard plus `canvas.json`. The assembled
+canvas is a build artifact and is gitignored; these files are what you edit.
+
+`go test ./design/` reads the palette and type ramp **out of
+`internal/ui/theme.go`** and fails on any colour or size in a mockup that the
+app cannot render — so the design cannot drift from the code, and the code
+cannot drift from the design, without the build saying so. It also asserts the
+design's own intent: the prediction screen must not name the target it is
+asking for, the reveal screen must state that a limit exists, and every ledger
+entry must name the source a false belief was borrowed from.
+
+Changing a theme colour and forgetting the mockups is now a test failure, which
+is the point. To re-assemble after editing artboards, re-run the `/design`
+skill's seeder over `design/*.dc.html` and republish.
+
 ## Layout
 
 ```

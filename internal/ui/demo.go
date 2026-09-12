@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"image/png"
 	"os"
@@ -56,12 +57,8 @@ func (s *Shell) Seed() {
 
 // refreshMasteryWith paints the sidebar from explicit items.
 func (s *Shell) refreshMasteryWith(items []ext.MasteryItem) {
-	rows := make([]fyne.CanvasObject, 0, len(items))
-	for _, it := range items {
-		rows = append(rows, progressRow(s.pal, it.Label, it.Level, it.Debt))
-	}
-	s.side.Objects = rows
-	s.side.Refresh()
+	s.cfg.Mastery = func(context.Context) []ext.MasteryItem { return items }
+	s.refreshMastery()
 }
 
 // Ask submits text as if the learner had typed it, once the window has settled.

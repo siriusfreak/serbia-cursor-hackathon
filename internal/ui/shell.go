@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"image/color"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -126,10 +127,9 @@ func (s *Shell) footer() fyne.CanvasObject {
 func (s *Shell) sidebar() fyne.CanvasObject {
 	s.side = container.NewVBox(muted("Answer a question and progress appears here."))
 
-	blocks := container.NewVBox(
-		sectionLabel("PROGRESS"),
-		s.side,
-	)
+	// No heading here: refreshMastery emits its own group labels, and a
+	// "PROGRESS" above "COGNITIVE DEBT" reads as a category error.
+	blocks := container.NewVBox(s.side)
 	if len(s.cfg.Plugins) > 0 {
 		rows := make([]fyne.CanvasObject, 0, len(s.cfg.Plugins))
 		for _, p := range s.cfg.Plugins {
@@ -302,9 +302,31 @@ func (s *Shell) refreshMastery() {
 	if len(items) == 0 {
 		return
 	}
-	rows := make([]fyne.CanvasObject, 0, len(items))
+	var debt, mastery []fyne.CanvasObject
 	for _, it := range items {
-		rows = append(rows, progressRow(s.pal, it.Label, it.Level, it.Debt))
+		switch {
+		case it.Debt > 0.4:
+			// Bar shows the debt itself, so its length and its label agree.
+			debt = append(debt, progressRow(s.pal, it.Label, it.Debt,
+				strconv.FormatFloat(it.Debt, 'f', 1, 64), s.pal.accent))
+		case it.Level > 0:
+			mastery = append(mastery, progressRow(s.pal, it.Label, it.Level,
+				strconv.Itoa(int(it.Level*100))+"%", s.pal.success))
+		}
+	}
+
+	rows := make([]fyne.CanvasObject, 0, len(items)+4)
+	if len(debt) > 0 {
+		rows = append(rows, sectionLabel("COGNITIVE DEBT"))
+		rows = append(rows, debt...)
+		rows = append(rows, muted("what you lean on and do not hold"))
+	}
+	if len(mastery) > 0 {
+		if len(rows) > 0 {
+			rows = append(rows, widget.NewSeparator())
+		}
+		rows = append(rows, sectionLabel("MASTERY"))
+		rows = append(rows, mastery...)
 	}
 	s.side.Objects = rows
 	s.side.Refresh()

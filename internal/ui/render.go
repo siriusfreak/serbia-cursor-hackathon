@@ -4,6 +4,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -194,7 +195,15 @@ func renderMastery(v ext.ViewSpec) fyne.CanvasObject {
 
 	rows := make([]fyne.CanvasObject, 0, len(p.Items))
 	for _, it := range p.Items {
-		rows = append(rows, progressRow(pal, it.Label, it.Level, it.Debt))
+		// Debt and mastery are different scales: draw whichever one this row
+		// is actually about, so the bar's length and its label agree.
+		if it.Debt > 0.4 {
+			rows = append(rows, progressRow(pal, it.Label, it.Debt,
+				strconv.FormatFloat(it.Debt, 'f', 1, 64), pal.accent))
+			continue
+		}
+		rows = append(rows, progressRow(pal, it.Label, it.Level,
+			strconv.Itoa(int(it.Level*100))+"%", pal.success))
 	}
 	return container.NewVBox(rows...)
 }

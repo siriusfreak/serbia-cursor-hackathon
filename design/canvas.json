@@ -1,0 +1,17 @@
+{
+  "artboards": [
+    { "file": "Prediction.dc.html", "x": 0,    "y": 0,   "w": 800,  "h": 470, "title": "1 · Elicit" },
+    { "file": "Reveal.dc.html",     "x": 880,  "y": 0,   "w": 800,  "h": 540, "title": "2 · Reveal" },
+    { "file": "Contrast.dc.html",   "x": 1760, "y": 0,   "w": 800,  "h": 580, "title": "3 · Contrast" },
+    { "file": "Falsify.dc.html",    "x": 0,    "y": 760, "w": 800,  "h": 490, "title": "Task type · Falsify" },
+    { "file": "Ledger.dc.html",     "x": 880,  "y": 760, "w": 800,  "h": 850, "title": "Record · Misconception ledger" },
+    { "file": "Main.dc.html",       "x": 1760, "y": 760, "w": 1180, "h": 780, "title": "Full window" }
+  ],
+  "annotations": [
+    { "id": "loop", "x": 0, "y": -240, "w": 620,
+      "text": "The inversion: ask before you tell.\n\nelicit → attempt → reveal → contrast → record → schedule\n\nA guess made before the answer is worth more than a right answer read off the page." },
+    { "id": "debt-note", "x": 880, "y": 1700, "w": 560,
+      "text": "The ledger is debt this system issued. Every analogy lends an intuition; these are the ones still carried past the point where they hold." }
+  ],
+  "launch": { "view": "canvas" }
+}

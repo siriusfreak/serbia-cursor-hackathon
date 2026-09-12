@@ -76,7 +76,23 @@ internal/ui/      theme, components, renderer, bridge to the runner
 exts/             plugins: profile, assessor, analogy (agent), github (retrieval)
 cmd/ext-github/   the same github plugin, as a standalone process
 docs/             PLUGIN_GUIDE.md
+design/           design canvas artboards, checked against the app theme
 ```
+
+## Design
+
+`design/` holds the screens for the learning loop — predict the mapping before
+it is revealed, contrast against what you actually said, and track the false
+beliefs an analogy lends you.
+
+```bash
+go test ./design/
+```
+
+That test reads the palette and type ramp straight out of
+[`internal/ui/theme.go`](internal/ui/theme.go), so a mockup using a colour the
+app cannot render is a build failure — and so is a screen that gives away the
+answer it is supposed to be asking for.
 
 ## Running a plugin in its own process
 

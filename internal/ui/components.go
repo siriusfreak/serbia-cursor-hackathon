@@ -83,29 +83,29 @@ func chip(text string, fg color.Color, bg color.Color) fyne.CanvasObject {
 	return container.NewHBox(container.NewStack(r, inner), layout.NewSpacer())
 }
 
-// progressRow is one concept's mastery bar plus its debt marker.
-func progressRow(p palette, label string, level, debt float64) fyne.CanvasObject {
+// progressRow draws one labelled bar.
+//
+// fraction and fill are the CALLER's decision, deliberately: mastery and debt
+// are different scales, and deriving the bar from one while labelling it with
+// the other made a full amber bar and a near-full green bar look like the same
+// object while meaning opposite things.
+func progressRow(p palette, label string, fraction float64, right string, fill color.Color) fyne.CanvasObject {
 	track := canvas.NewRectangle(p.surfaceHi)
 	track.CornerRadius = 3
 	track.SetMinSize(fyne.NewSize(0, 6))
 
-	fillColor := p.success
-	if level < 0.34 {
-		fillColor = p.accent
-	}
-	fill := canvas.NewRectangle(fillColor)
-	fill.CornerRadius = 3
-	fill.SetMinSize(fyne.NewSize(0, 6))
-
-	bar := container.New(&barLayout{fraction: clamp01(level)}, track, fill)
+	bar := canvas.NewRectangle(fill)
+	bar.CornerRadius = 3
+	bar.SetMinSize(fyne.NewSize(0, 6))
 
 	name := styledText(label, theme.ColorNameForeground, theme.SizeNameCaptionText, fyne.TextStyle{})
-	right := tag(pct(level), theme.ColorNamePlaceHolder, fyne.TextStyle{})
-	if debt > 0.35 {
-		right = tag("debt "+strconv.FormatFloat(debt, 'f', 1, 64), theme.ColorNameWarning, fyne.TextStyle{Bold: true})
+	tail := tag(right, theme.ColorNamePlaceHolder, fyne.TextStyle{})
+	if fill == p.accent {
+		tail = tag(right, theme.ColorNameWarning, fyne.TextStyle{Bold: true})
 	}
-	head := container.NewBorder(nil, nil, nil, right, name)
-	return container.NewVBox(head, bar)
+
+	head := container.NewBorder(nil, nil, nil, tail, name)
+	return container.NewVBox(head, container.New(&barLayout{fraction: clamp01(fraction)}, track, bar))
 }
 
 // barLayout sizes a progress fill to a fraction of the track.

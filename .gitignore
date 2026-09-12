@@ -38,3 +38,6 @@ go.work.sum
 
 # Built out-of-process plugin binaries
 /plugins/
+
+# Seeded design canvas (build artifact, ~2MB payload)
+design/*.html
