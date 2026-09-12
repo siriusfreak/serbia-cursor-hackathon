@@ -30,3 +30,8 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local database and generated previews
+*.db
+*.db-journal
+*.png
