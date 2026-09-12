@@ -258,6 +258,24 @@ func (s *Shell) appendToolResult(name string, result map[string]any) {
 			return
 		}
 		s.AppendView(ext.View(ext.ViewAnalogyTable, "", table))
+
+	case strings.HasSuffix(name, "fal_illustrate"):
+		var img struct {
+			URL    string `json:"url"`
+			Source string `json:"source"`
+			Target string `json:"target"`
+		}
+		if json.Unmarshal(raw, &img) != nil || img.URL == "" {
+			return
+		}
+		// The caption repeats the pair in text because the generator garbles
+		// labels inside the picture often enough that the image alone cannot be
+		// trusted to say which side is which.
+		s.AppendView(ext.View(ext.ViewImage, "", ext.ImageProps{
+			URL:     img.URL,
+			Caption: img.Source + "  maps to  " + img.Target,
+			Alt:     "drawing " + img.Source + " against " + img.Target + "…",
+		}))
 	}
 	// A card starts a fresh text block beneath it.
 	s.streaming.Reset()

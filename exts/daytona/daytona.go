@@ -78,9 +78,10 @@ func (e *Ext) Manifest() ext.Manifest {
 		Provides: []ext.ToolSpec{{
 			Name: "run_task",
 			Description: "Runs the learner's code against your tests in a disposable sandbox and reports which " +
-				"tests passed. Use this for L4: give them a small problem in the target domain, write tests that " +
-				"fail specifically when a borrowed intuition is wrong, and grade on the result rather than on the " +
-				"prose. Each failing test names a misconception worth recording.",
+				"tests passed. Reach for it whenever a belief can be settled by running something, and ALWAYS in " +
+				"the same turn the learner asks for a coding task -- whatever rung they are on. Give them a small " +
+				"problem in the target domain and write tests that fail specifically when a borrowed intuition is " +
+				"wrong. Each failing test names a misconception, worded better than you could word it.",
 			Schema: json.RawMessage(`{
 				"type": "object",
 				"properties": {

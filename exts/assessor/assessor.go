@@ -18,8 +18,27 @@ import (
 	"github.com/sirius/cogdebt/internal/store"
 )
 
-// pendingKey is where the open question is parked between ask and grade.
-const pendingKey = "pending"
+const (
+	// pendingKey is where the open question is parked between ask and grade.
+	pendingKey = "pending"
+	// lastKey holds the concept most recently graded and how many times in a
+	// row it has been missed.
+	lastKey = "last"
+	// missThreshold is the score below which an answer counts as missed.
+	missThreshold = 0.5
+	// maxRetries is how many times in a row the same concept may be re-probed
+	// before moving on. Two is enough to make a miss concrete; more than that
+	// and the learner is being drilled rather than taught.
+	maxRetries = 2
+)
+
+// streak is what next() needs from the previous grade to decide whether to
+// stay on a concept or move on.
+type streak struct {
+	Concept string  `json:"concept"`
+	Score   float64 `json:"score"`
+	Misses  int     `json:"misses"`
+}
 
 // Ext is the assessor plugin.
 type Ext struct {
@@ -102,6 +121,32 @@ func (e *Ext) next(ctx context.Context) (json.RawMessage, error) {
 	}
 	if len(rows) == 0 {
 		return nil, ext.NotFoundf("the profile is empty; ask the learner what they know and call profile_upsert first")
+	}
+
+	// Stay on a concept the learner just missed, before anything else.
+	//
+	// Picking purely by weakest grip rotates: grading one concept up makes the
+	// next-weakest the new winner, so a learner who gives the same wrong answer
+	// three times is asked about three different concepts and never has to
+	// confront it. A live run did exactly that -- "entropy is messiness",
+	// graded low three times across three concepts, never challenged directly.
+	if st, ok := e.readStreak(ctx); ok && st.Score < missThreshold && st.Misses < maxRetries {
+		for _, cm := range rows {
+			if domain.SlugID(cm.Concept.Name) != domain.SlugID(st.Concept) {
+				continue
+			}
+			level := domain.NextLevel(cm.Mastery)
+			return ext.JSON(map[string]any{
+				"concept":  cm.Concept.Name,
+				"level":    level.String(),
+				"level_is": levelMeaning(level),
+				"mastery":  cm.Mastery.Level,
+				"retry":    true,
+				"ask_for": "They just missed this. Do not reword the same question -- give them a concrete case " +
+					"where their answer produces the wrong result, and ask what happens in it.",
+				"then": "Write the question in the learner's language, then call assessor_ask.",
+			})
+		}
 	}
 
 	best, bestScore := rows[0], -1.0
@@ -189,6 +234,7 @@ func (e *Ext) grade(ctx context.Context, in json.RawMessage) (json.RawMessage, e
 	if err := e.kv.Set(ctx, pendingKey, "{}"); err != nil {
 		return nil, ext.Internalf("clear open question: %v", err)
 	}
+	e.recordStreak(ctx, pending.Concept, a.Score)
 
 	next := domain.NextLevel(domain.Mastery{Level: level})
 	return ext.JSON(map[string]any{
@@ -198,6 +244,29 @@ func (e *Ext) grade(ctx context.Context, in json.RawMessage) (json.RawMessage, e
 		"next_level": next.String(),
 		"next_is":    levelMeaning(next),
 	})
+}
+
+// readStreak reports the previous grade. A missing or unreadable record simply
+// means there is no streak: this must never fail a probe.
+func (e *Ext) readStreak(ctx context.Context) (streak, bool) {
+	var st streak
+	ok, err := e.kv.GetJSON(ctx, lastKey, &st)
+	if err != nil || !ok || st.Concept == "" {
+		return streak{}, false
+	}
+	return st, true
+}
+
+// recordStreak counts consecutive misses on one concept.
+func (e *Ext) recordStreak(ctx context.Context, concept string, score float64) {
+	st, _ := e.readStreak(ctx)
+	next := streak{Concept: concept, Score: score}
+	if score < missThreshold && domain.SlugID(st.Concept) == domain.SlugID(concept) {
+		next.Misses = st.Misses + 1
+	} else if score < missThreshold {
+		next.Misses = 1
+	}
+	_ = e.kv.SetJSON(ctx, lastKey, next)
 }
 
 func parseLevel(s string) domain.Level {

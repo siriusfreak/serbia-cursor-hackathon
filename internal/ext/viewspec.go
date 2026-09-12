@@ -30,6 +30,7 @@ const (
 	ViewAnalogyTable = "analogy_table"
 	ViewQuestion     = "question"
 	ViewMastery      = "mastery"
+	ViewImage        = "image"
 )
 
 // StackProps configures a container.
@@ -57,6 +58,21 @@ type AnalogyRow struct {
 // AnalogyTableProps is the analogy table.
 type AnalogyTableProps struct {
 	Rows []AnalogyRow `json:"rows"`
+}
+
+// ImageProps is a picture fetched from a URL.
+//
+// The bytes deliberately do not cross the ABI. An image generator answers with
+// a URL, and a plugin that returned base64 instead would push megabytes through
+// every transport -- including net/rpc, where the whole payload is buffered.
+// The host fetches, so a plugin stays a thin description of what to draw.
+type ImageProps struct {
+	URL string `json:"url"`
+	// Caption is the line under the picture. It carries the meaning when the
+	// generator garbles the labels inside the image, which it will.
+	Caption string `json:"caption,omitempty"`
+	// Alt is shown while the fetch is in flight and if it fails.
+	Alt string `json:"alt,omitempty"`
 }
 
 // QuestionProps asks the learner something.

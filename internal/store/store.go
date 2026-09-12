@@ -8,6 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,6 +56,16 @@ CREATE TABLE IF NOT EXISTS mappings (
 	created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS mappings_by_user ON mappings(user_id);
+
+-- One row per pairing. An analogy recorded twice is an UPDATE, not a second
+-- card on screen: the analogy agent saves its own pairs and a caller that
+-- re-saves them was, before this index, doubling the table the learner reads.
+-- Duplicates from before it existed are collapsed to the newest, because the
+-- index cannot be created while they are still there.
+DELETE FROM mappings WHERE id NOT IN (
+	SELECT MAX(id) FROM mappings GROUP BY user_id, source_id, target_id
+);
+CREATE UNIQUE INDEX IF NOT EXISTS mappings_pair ON mappings(user_id, source_id, target_id);
 
 -- Namespaced scratch space so a plugin can persist state without touching
 -- the schema. See (*Store).KV.
@@ -209,15 +220,60 @@ func (s *Store) SetFrequency(ctx context.Context, userID, conceptID string, freq
 }
 
 // SaveMapping stores one analogy for later display.
+//
+// Recording the same pairing twice UPDATES it -- the analogy agent saves its own
+// pairs and its caller may save them again as a safety net, and two rows for one
+// mapping means the learner reads it twice. The second writer usually has less
+// to say than the first, so fields it leaves empty keep whatever was already
+// there: a restatement must never be able to silently delete a carry_over or a
+// breakdown.
 func (s *Store) SaveMapping(ctx context.Context, userID string, m domain.Mapping) error {
+	sourceID, targetID := domain.SlugID(m.Source.Name), domain.SlugID(m.Target.Name)
+
+	var existing string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT payload FROM mappings WHERE user_id=? AND source_id=? AND target_id=?`,
+		userID, sourceID, targetID).Scan(&existing)
+	switch {
+	case err == nil:
+		var prev domain.Mapping
+		if json.Unmarshal([]byte(existing), &prev) == nil {
+			m = mergeMapping(prev, m)
+		}
+	case !errors.Is(err, sql.ErrNoRows):
+		return err
+	}
+
 	payload, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO mappings(user_id,source_id,target_id,payload,created_at) VALUES(?,?,?,?,?)`,
-		userID, domain.SlugID(m.Source.Name), domain.SlugID(m.Target.Name), string(payload), time.Now().Unix())
+		`INSERT INTO mappings(user_id,source_id,target_id,payload,created_at) VALUES(?,?,?,?,?)
+		 ON CONFLICT(user_id,source_id,target_id) DO UPDATE SET payload=excluded.payload, created_at=excluded.created_at`,
+		userID, sourceID, targetID, string(payload), time.Now().Unix())
 	return err
+}
+
+// mergeMapping lets the newer statement win field by field, falling back to the
+// older one wherever the newer is silent.
+func mergeMapping(prev, next domain.Mapping) domain.Mapping {
+	if next.SharedRole == "" {
+		next.SharedRole = prev.SharedRole
+	}
+	if len(next.CarryOver) == 0 {
+		next.CarryOver = prev.CarryOver
+	}
+	if len(next.Breakdown) == 0 {
+		next.Breakdown = prev.Breakdown
+	}
+	if next.Source.Name == "" {
+		next.Source = prev.Source
+	}
+	if next.Target.Name == "" {
+		next.Target = prev.Target
+	}
+	return next
 }
 
 // Mappings returns the analogies saved for a learner, newest first.

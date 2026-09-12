@@ -1,8 +1,12 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
 	"image/png"
 	"os"
 	"time"
@@ -38,6 +42,11 @@ func (s *Shell) Seed() {
 		},
 	}}))
 
+	s.AppendView(ext.View(ext.ViewImage, "", ext.ImageProps{
+		URL:     seedImage(),
+		Caption: "etcd  maps to  feature store",
+	}))
+
 	s.AppendView(ext.View(ext.ViewQuestion, "q1", ext.QuestionProps{
 		Level:  "L2",
 		Prompt: "You said a model registry is etcd for models. Where does that analogy stop working?",
@@ -53,6 +62,50 @@ func (s *Shell) Seed() {
 		{Label: "feature store", Level: 0.18, Debt: 0.9},
 		{Label: "point-in-time correctness", Level: 0.05, Debt: 1.4},
 	})
+}
+
+// seedImage puts a diagram in the image cache and returns its url, so the
+// preview exercises the real fetch-and-draw path without a network call and
+// without spending an image generation.
+func seedImage() string {
+	const url = "cogdebt://seed/diagram.png"
+	imageCache.Store(url, diagramPNG())
+	return url
+}
+
+// diagramPNG draws the shape fal is asked for: two boxes, a link between them,
+// and a break in the link. Deliberately crude -- it stands in for a generated
+// picture, it does not pretend to be one.
+func diagramPNG() []byte {
+	const w, h = 800, 340
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	bg := color.RGBA{R: 0x14, G: 0x16, B: 0x1A, A: 0xff}
+	amber := color.RGBA{R: 0xE8, G: 0xA3, B: 0x3D, A: 0xff}
+	draw.Draw(img, img.Bounds(), &image.Uniform{bg}, image.Point{}, draw.Src)
+
+	box := func(x0, y0, x1, y1 int) {
+		for x := x0; x <= x1; x++ {
+			img.Set(x, y0, amber)
+			img.Set(x, y1, amber)
+		}
+		for y := y0; y <= y1; y++ {
+			img.Set(x0, y, amber)
+			img.Set(x1, y, amber)
+		}
+	}
+	box(60, 110, 300, 230)
+	box(500, 110, 740, 230)
+	// The link, with a gap in the middle: the breakdown is part of the drawing.
+	for x := 300; x <= 500; x++ {
+		if x > 380 && x < 420 {
+			continue
+		}
+		img.Set(x, 170, amber)
+	}
+
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
 }
 
 // refreshMasteryWith paints the sidebar from explicit items.

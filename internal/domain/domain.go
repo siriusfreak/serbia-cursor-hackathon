@@ -8,8 +8,8 @@
 package domain
 
 import (
-	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Role is a concept's structural position in its domain. Analogies are matched
@@ -139,11 +139,28 @@ func clamp01(v float64) float64 {
 	return max(0, min(1, v))
 }
 
-var nonSlug = regexp.MustCompile(`[^a-z0-9]+`)
-
 // SlugID derives a stable concept ID from a display name, so the same skill
 // typed twice does not become two concepts.
+//
+// Letters in ANY script are kept. An ASCII-only rule looks harmless until the
+// learner writes in their own language: it strips every character of
+// "динамическое программирование", leaves the empty string, and the profile
+// refuses a concept it cannot identify. A tutor whose first promise is to reply
+// in the learner's language cannot then be unable to remember what they said.
+// An id is not a URL here -- it only has to be stable and distinct.
 func SlugID(name string) string {
-	s := nonSlug.ReplaceAllString(strings.ToLower(strings.TrimSpace(name)), "-")
-	return strings.Trim(s, "-")
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			dash = false
+			b.WriteRune(r)
+			continue
+		}
+		dash = true
+	}
+	return b.String()
 }

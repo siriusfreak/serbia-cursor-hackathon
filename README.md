@@ -74,7 +74,8 @@ restart, and the root agent never learns that plugins exist at all.
 ## Layout
 
 ```
-cmd/cogdebt/      entry point and wiring
+cmd/cogdebt/      entry point: flags, the window, the CLI REPL
+internal/app/     the one construction path, shared by shell and scenarios
 internal/ext/     ABI, registry, ADK adapter, ViewSpec
 internal/domain/  concepts, mastery, analogies, debt — no external deps
 internal/store/   SQLite (modernc, cgo-free) + namespaced KV for plugins
@@ -82,6 +83,7 @@ internal/ui/      theme, components, renderer, bridge to the runner
 exts/             plugins: profile, assessor, analogy (agent), github, exa,
                   firecrawl, fal, daytona
 cmd/ext-github/   the same github plugin, as a standalone process
+e2e/              scenarios: a simulated learner works through a field
 docs/             PLUGIN_GUIDE.md
 design/           design canvas artboards, checked against the app theme
 ```
@@ -114,6 +116,42 @@ passed=1 failed=1 in 2252ms
 ```
 
 That line is a misconception, already worded for the ledger.
+
+## Does it actually teach?
+
+`go test ./...` proves each plugin answers correctly. It cannot prove the claim
+this project is making — that a profile turns into an analogy, the analogy turns
+into a rung of questions, and answering them moves mastery. That is a property
+of the loop, so `e2e/` runs the loop.
+
+Each scenario is a learner with a **misconception** carried over from their own
+field, played by a simulated student for the whole conversation. Four fields,
+because each one asks something different of the system:
+
+| scenario | knows | learning | plugin it leans on |
+|---|---|---|---|
+| algorithms | Python, pandas, SQL windows | dynamic programming | Daytona — run the code |
+| biology | microservices, queues, retries | MAPK signalling | Exa + Firecrawl — ground it in a source |
+| physics | rate limiting, backpressure | entropy | fal — draw the mapping |
+| distributed systems | Go, Postgres, a GitHub login | Raft | GitHub scan — measure what they lean on |
+
+```bash
+COGDEBT_LIVE=1 go test ./e2e/ -v -timeout 30m
+```
+
+Every run writes `e2e/out/<scenario>.md`: which tools fired and how often, the
+rungs in the order they were asked, the analogies with their breakdowns, final
+mastery and debt, and the transcript, plus an `index.md` across all of them. The
+assertions say the loop held together. The transcript is how you judge whether
+the teaching was any good.
+
+It earned its keep immediately. The first four runs turned up four defects that
+compiled, passed every unit test and looked fine in a demo: the analogy table was
+being recorded twice, the ladder rotated between concepts instead of pressing on
+the one the learner kept getting wrong, a learner who asked outright for a coding
+task was promised one four turns running and never given it, and a model wrote a
+thousand words of its own deliberation into a field meant to hold a two-word role.
+`AGENTS.md` has the details.
 
 ## Design
 

@@ -18,6 +18,9 @@ go test ./...
 go run ./cmd/cogdebt                            # desktop window
 go run ./cmd/cogdebt -cli -debug                # REPL; every tool call is printed
 go run ./cmd/cogdebt -screenshot /tmp/p.png     # sample content -> PNG -> exit, no model call
+
+COGDEBT_LIVE=1 go test ./e2e/ -v -timeout 30m   # every scenario, against the real model and services
+COGDEBT_LIVE=1 go test ./e2e/ -run Physics -v   # one of them
 ```
 
 Go 1.27+ via `GOTOOLCHAIN=auto`. A model key lives in `.env` (gitignored):
@@ -181,6 +184,90 @@ COGDEBT_LIVE=1 go test ./exts/daytona/ -run Live -v
 These caught what stubs cannot. The Daytona plugin passed its stub suite while
 being unable to reach a real sandbox at all.
 
+## End-to-end scenarios are about the loop, not about a plugin
+
+`e2e/` runs the thing the README claims: a profile becomes an analogy, the
+analogy becomes a rung of questions, and answering them moves mastery. No unit
+test can show that, because it is a property of the loop rather than of any
+component.
+
+A scenario is a learner. `e2e.Learner` carries what they already hold, what they
+came for, and — the load-bearing field — the **misconception** they are carrying
+over from their own field. A simulated student plays that persona for the whole
+conversation. Without a misconception the student answers everything correctly,
+every grade comes back 1.0, and the run proves only that the happy path is
+happy; `Learner.instruction()` is mostly negative instructions for exactly this
+reason.
+
+Four fields, four reasons to reach for a different plugin:
+
+| scenario | learner brings | plugin under test | why this field |
+|---|---|---|---|
+| `algorithms` | Python, pandas, SQL windows | `daytona_run_task` | the answer can be executed, so the grade is not an opinion |
+| `biology` | microservices, queues, retries | `exa_search`, `firecrawl_fetch` | the model's recall of a signalling cascade is not trustworthy; ground it |
+| `physics` | rate limiting, backpressure | `fal_illustrate` | the mapping is a picture before it is a paragraph |
+| `distributed-systems` | Go, Postgres, a GitHub login | `github_scan` | the repos say what they lean on, which self-report misses |
+
+Every scenario asserts the same process invariants in `assertProcess`,
+whatever the field: an analogy was recorded, no analogy shipped without a
+breakdown, the assessor chose the rung (not the model), and something that was
+asked was graded. `MustCall` is per-scenario and is the honest part — a biology
+run that never fetched a source proved nothing about retrieval, so it fails.
+
+Each run writes `e2e/out/<scenario>.md`: tools with counts, the rungs asked in
+order, the analogies with their breakdowns, final mastery and debt, and the full
+transcript. Read it. A green run says the loop held together; only the words say
+whether the teaching was any good.
+
+The student uses `COGDEBT_STUDENT_MODEL` (default the non-reasoning model). Do
+not "improve" it to a reasoning model: it is playing a part, not solving the
+problem, and a stronger model quietly stops being the beginner it was asked to
+be.
+
+### What the first runs found
+
+Four defects, in the first two hours of the suite existing. Every one of them
+compiled, passed the whole unit suite, and was invisible in a demo.
+
+- **The analogy table was recorded twice.** The analogy agent saves its own
+  pairs; the tutor then called `profile_save_analogy` with the same three. There
+  was no uniqueness on `(user_id, source_id, target_id)`, so the learner read
+  every mapping twice. The first fix was a unique index plus a prohibition in
+  the root instruction, and the prohibition immediately made it worse: on the
+  next run the agent did not record anything either and the table came back
+  empty. The tutor's call is a safety net, not a duplicate. So the store now
+  merges instead — a re-save updates the pairing, and any field the second
+  writer leaves empty keeps what the first one said — and the instruction asks
+  the tutor to save only if the agent did not.
+- **The ladder rotated instead of climbing.** `assessor_next` picked the
+  weakest concept, so grading one up made the next-weakest the winner. The
+  student answered "entropy is just messiness" three times about three
+  different concepts and was never once shown where that fails. `next` now
+  stays on a concept scored below 0.5, for at most two retries, and returns
+  `retry: true` with different guidance — make the miss concrete rather than
+  reword the question. `exts/assessor/assessor_test.go` covers both halves:
+  it sticks after a miss, and it moves on after a good answer.
+- **The sandbox was promised and never run.** The learner asked for a coding
+  task outright; the tutor said "after this card I'll give you code and run the
+  tests" four turns running and never did, because `daytona_run_task` described
+  itself as "use this for L4" and the learner was on L1. The description now
+  says to run code whenever a belief can be settled that way, and always in the
+  turn it is asked for; the root instruction says the same. A belief that can be
+  executed should be.
+- **Concept ids erased any language but English.** `SlugID` was
+  `[^a-z0-9]+` -> `-`, so "динамическое программирование" slugged to the empty
+  string and `profile_upsert` refused it: "none of the skill names contained
+  usable characters". Every scenario that had run until then happened to use
+  English concept names, which is why unit tests, the demo and three live runs
+  all missed it. An id here only has to be stable and distinct — it is not a
+  URL — so it now keeps letters and digits in any script.
+- **A model wrote its reasoning into a tool argument.** The analogy agent filled
+  `shared_role` with a thousand-word deliberation ending "So pairs: ...", which
+  was stored and would have rendered on screen as the role. `profile_save_analogy`
+  now caps the fields (120 characters for a name or a role, 800 for prose) and
+  the fault names the offending field — faults come back as results, so the model
+  simply writes a shorter one and carries on.
+
 ## Daytona's toolbox does not take the organization key
 
 Worth writing down, because the published spec points the wrong way and the
@@ -285,7 +372,10 @@ a download that silently refuses to open is the same as no download.
 ## Layout
 
 ```
-cmd/cogdebt/      entry point, wiring, CLI REPL
+cmd/cogdebt/      entry point: flags, logging, the shell, the CLI REPL
+internal/app/     the ONE construction path — store, model, plugins, agent,
+                  runner, and the root instruction. Shell, REPL and scenarios
+                  all build the same object graph from here.
 internal/ext/     THE CONTRACT. abi.go is the whole plugin ABI.
                   registry.go validates and holds; adk.go adapts to ADK;
                   viewspec.go and agentspec.go are declarative payloads;
@@ -299,6 +389,8 @@ internal/ext/subprocess/  out-of-process transport (go-plugin over net/rpc)
 exts/             plugins: profile and assessor (host state, in-process),
                   analogy (declarative agent), github (portable, HTTP only)
 cmd/ext-github/   github as a standalone plugin process
+e2e/              scenarios: a simulated learner works through a field
+                  against the real model and the real plugins
 presentation/     the hackathon deck (static HTML, no build) + SPEECH.md;
                   deployed to Render from master, checked by design/deck_test.go
 docs/             PLUGIN_GUIDE.md — written for plugin authors
@@ -310,11 +402,13 @@ docs/             PLUGIN_GUIDE.md — written for plugin authors
   `exttest.Conformance` — it enforces what the host enforces.
 - **New `ViewSpec` type**: add the constant and props struct to
   `internal/ext/viewspec.go`, a case to `ui.Render`, and seed it in
-  `ui/demo.go` so `-screenshot` covers it.
+  `ui/demo.go` so `-screenshot` covers it. If it needs bytes from somewhere,
+  the host fetches them — see `image`, where the plugin returns only a URL.
 - **Changing `ext.Extension`, `Manifest` or `ToolSpec` incompatibly**: bump
   `ext.ABIVersion` and say so in `docs/PLUGIN_GUIDE.md`. Old plugins then fail
   to load with a clear message instead of misbehaving.
-- **Prompt changes**: the root instruction is in `cmd/cogdebt/main.go`; the
+- **Prompt changes**: the root instruction is `app.RootInstruction` in
+  `internal/app/app.go`; the
   analogy strategy is `structureMappingInstruction` in `exts/analogy`. Both
   must keep the "reply in the learner's language" rule.
 - **Verify before reporting.** Build, vet, test, and for anything user-visible
@@ -338,3 +432,21 @@ Two things about the ladder worth knowing before changing it:
   itself rather than leaving it to its caller. A caller asked to record someone
   else's output skips it whenever the reply is long, and the table never reaches
   the screen.
+- **`appendToolResult` also knows `fal_illustrate`.** The plugin returns a URL
+  and nothing else; the host downloads it. Bytes do not cross the ABI — see the
+  note on `ext.ImageProps`.
+
+## Not built yet
+
+- **A cheap diagram plugin.** `fal` generates a picture per call, which costs
+  money and garbles its own labels — the caption under the image exists to
+  compensate. A Graphviz-backed plugin would render the same `AnalogyRow` set
+  deterministically, for free, with labels that are correct by construction. It
+  would emit the same `image` ViewSpec, so nothing in the UI changes; only the
+  source of the bytes does (a local `dot` writes a file, so the node would need
+  a `file://` or data URL path, or the plugin returns SVG and the host renders
+  it). Keep `fal` for the cases where an evocative picture beats a correct box
+  diagram.
+- **The extraction loop.** `design/` has the screens — predict before reveal,
+  contrast against what the learner actually said, the misconception ledger —
+  and they are designed and checked but not implemented.

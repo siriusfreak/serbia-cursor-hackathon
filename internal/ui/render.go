@@ -32,6 +32,8 @@ func Render(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
 		return renderQuestion(v, emit)
 	case ext.ViewMastery:
 		return renderMastery(v)
+	case ext.ViewImage:
+		return renderImage(v)
 	default:
 		return muted(fmt.Sprintf("[unsupported view %q — update the app]", v.Type))
 	}

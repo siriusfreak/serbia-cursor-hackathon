@@ -120,9 +120,9 @@ func (e *Ext) Manifest() ext.Manifest {
 								"properties": {
 									"source":      {"type": "string", "description": "Concept the learner already holds"},
 									"target":      {"type": "string", "description": "Concept in the new field"},
-									"shared_role": {"type": "string", "description": "Structural role that justifies the pairing"},
-									"carry_over":  {"type": "string", "description": "What their intuition gets right"},
-									"breakdown":   {"type": "string", "description": "Where that intuition will mislead them"}
+									"shared_role": {"type": "string", "description": "Short noun phrase naming the role both play, e.g. \"source of truth\". Not a sentence, and never your reasoning."},
+									"carry_over":  {"type": "string", "description": "What their intuition gets right. One or two sentences."},
+									"breakdown":   {"type": "string", "description": "Where that intuition will mislead them. One or two sentences."}
 								},
 								"required": ["source", "target", "breakdown"]
 							}
@@ -321,6 +321,9 @@ func (e *Ext) saveAnalogy(ctx context.Context, in json.RawMessage) (json.RawMess
 
 	rows := make([]ext.AnalogyRow, 0, len(a.Rows))
 	for _, r := range a.Rows {
+		if err := checkLengths(r.Source, r.Target, r.SharedRole, r.CarryOver, r.Breakdown); err != nil {
+			return nil, err
+		}
 		m := domain.Mapping{
 			Source:     domain.Concept{ID: domain.SlugID(r.Source), Name: r.Source},
 			Target:     domain.Concept{ID: domain.SlugID(r.Target), Name: r.Target},
@@ -342,6 +345,38 @@ func (e *Ext) saveAnalogy(ctx context.Context, in json.RawMessage) (json.RawMess
 		})
 	}
 	return ext.JSON(map[string]any{"saved": len(rows), "rows": rows})
+}
+
+// Field caps. A model that has been asked for a structural role will sometimes
+// write its whole train of thought into that one string -- a live run produced
+// a thousand-word deliberation, ending in "So pairs: ...", stored as the role
+// and rendered on screen as one. Nothing downstream can recover from that, so
+// it is refused here where the fault text can tell the model what the field is
+// for; faults come back as results, so it simply writes a shorter one.
+const (
+	maxNameLen  = 120 // a concept name
+	maxRoleLen  = 120 // a role is a noun phrase, not an argument
+	maxProseLen = 800 // carry_over and breakdown are a sentence or two
+)
+
+func checkLengths(source, target, role, carryOver, breakdown string) error {
+	for _, f := range []struct {
+		name, value, want string
+		max               int
+	}{
+		{"source", source, "the name of a concept the learner holds", maxNameLen},
+		{"target", target, "the name of a concept in the new field", maxNameLen},
+		{"shared_role", role, "a short noun phrase naming the role both play, like \"source of truth\"", maxRoleLen},
+		{"carry_over", carryOver, "one or two sentences", maxProseLen},
+		{"breakdown", breakdown, "one or two sentences", maxProseLen},
+	} {
+		if len([]rune(f.value)) > f.max {
+			return ext.Invalidf("%s is %d characters; it must be at most %d, because it is %s. "+
+				"Write the pair again with a shorter %s -- do not put your reasoning in it",
+				f.name, len([]rune(f.value)), f.max, f.want, f.name)
+		}
+	}
+	return nil
 }
 
 func splitNonEmpty(s string) []string {
