@@ -18,9 +18,11 @@ The same notes are inside the deck. Press **N** during the presentation.
 
 ## 1 · Title
 
-> "Every technical system has a weakest part. In our systems the weakest part is
-> not the database, and it is not the model. It is the person who must
-> understand what we built.
+> "We are team BinSearch.
+>
+> Every technical system has a weakest part. In our systems the weakest part is
+> not the database, and it is not the model. It is the person who must understand
+> what we built.
 >
 > We built cogdebt for that person."
 

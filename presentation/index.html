@@ -26,9 +26,14 @@
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:var(--sans);overflow:hidden}
 
 /* A fixed 1280x720 stage, scaled to fit the screen. The layout is then the
-   same on every projector. */
-#viewport{position:fixed;inset:0;display:grid;place-items:center}
-#stage{width:1280px;height:720px;position:relative;flex:0 0 auto}
+   same on every projector.
+
+   The stage is pinned to the centre point and then moved back by half its own
+   scaled size. A grid with place-items:center cannot do this: an item wider
+   than its container is laid out from the start edge, not centred, so on any
+   window narrower than 1280 the slide drifted down and to the right. */
+#viewport{position:fixed;inset:0;overflow:hidden}
+#stage{width:1280px;height:720px;position:absolute;top:50%;left:50%;transform-origin:0 0}
 /* Slides are centred. A slide that does not fill 720px stays in the middle.
    A slide that needs a footer at the bottom puts a .grow before the footer. */
 .slide{position:absolute;inset:0;padding:60px 72px;display:none;flex-direction:column;
@@ -162,8 +167,8 @@ a:hover{border-bottom-color:var(--accent)}
 @media print{
   @page{size:1280px 720px;margin:0}
   html,body{overflow:visible;height:auto}
-  #viewport{position:static;display:block}
-  #stage{width:1280px;height:auto}
+  #viewport{position:static;display:block;overflow:visible}
+  #stage{position:static;width:1280px;height:auto;transform:none!important}
   .slide{position:static;display:flex!important;height:720px;page-break-after:always;
     animation:none;border-bottom:1px solid var(--line)}
   #bar,#count,#brand,#notes,#help{display:none}
@@ -187,6 +192,7 @@ a:hover{border-bottom-color:var(--accent)}
   <div class="rule" style="margin:0 0 18px"></div>
   <div class="cols" style="align-items:flex-end">
     <div class="tiny">
+      <span class="am mono" style="font-size:15px;font-weight:700;letter-spacing:.04em">BinSearch</span><br>
       <strong style="color:var(--fg)">Sirius</strong> — Team Lead, Nebius · architecture and idea<br>
       <strong style="color:var(--fg)">Danila</strong> — Senior Go Developer, Group-IB · Go implementation
     </div>
@@ -591,10 +597,12 @@ Judges check this. Finish on the last sentence about the engineer who leaves. Th
   var i = 0, notesOn = false;
 
   // The stage has a fixed size of 1280x720. We scale it to the screen, so a
-  // layout that fits here also fits on every projector.
+  // layout that fits here also fits on every projector. The translate puts the
+  // scaled stage back in the middle: its origin is the centre of the window.
   function fit() {
     var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
-    stage.style.transform = 'scale(' + s + ')';
+    stage.style.transform =
+      'translate(' + (-1280 * s / 2) + 'px,' + (-720 * s / 2) + 'px) scale(' + s + ')';
   }
 
   function show(n, push) {
