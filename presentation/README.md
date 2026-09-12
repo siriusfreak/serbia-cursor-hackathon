@@ -4,8 +4,8 @@ The cogdebt pitch deck for the Cursor Community Serbia Hackathon.
 
 **Live: https://serbia-cursor-hackathon.onrender.com**
 
-The binaries the last slide points at are the
-[v0.1.0 release](https://github.com/siriusfreak/serbia-cursor-hackathon/releases/tag/v0.1.0).
+The binaries the last slide points at are on the
+[releases page](https://github.com/siriusfreak/serbia-cursor-hackathon/releases).
 
 Plain static HTML — no build step, no dependencies, no CDN. Open
 [`index.html`](index.html) in any browser.

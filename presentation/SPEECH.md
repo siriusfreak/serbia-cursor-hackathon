@@ -233,11 +233,10 @@ Stop. Do not add a sentence after "thank you".
 > different set of terms returns a different number."
 
 **"Can we run it?"**
-> "The source is on GitHub, and there is a macOS build in the v0.1.0 release. The
-> binary is not signed, so remove the quarantine flag first — the release notes
-> give the command. There is no Linux or Windows build: the interface uses Fyne,
-> which needs cgo and OpenGL, and we could not cross-compile that from macOS
-> today. Build from source on those systems."
+> "The source is on GitHub, and the releases page has builds for macOS, Linux and
+> Windows, each on x86-64, ARM64 and 32-bit x86. No binary is signed, so macOS and
+> Windows both warn on the first run. The release notes give the exact command for
+> each system."
 
 **"Who pays for this?"**
 > "An individual pays because of fear. That is the Hacker News evidence. A company

@@ -54,3 +54,6 @@ __pycache__/
 # always clean up. It embeds a placeholder Fyne logo, so committing it would
 # put that icon into everyone's local build.
 /cmd/cogdebt/fyne_metadata_init.go
+/cmd/cogdebt/cogdebt
+/tmp-pkg/
+/cogdebt.tar.xz

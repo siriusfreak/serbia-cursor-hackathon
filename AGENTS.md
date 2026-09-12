@@ -250,6 +250,38 @@ The deck is plain static HTML with no build step and no dependencies: open
 speaker notes, `F` is fullscreen, and printing gives a PDF backup for when the
 projector loses the laptop.
 
+## Releasing binaries
+
+The interface uses Fyne, which needs cgo and OpenGL. A plain
+`GOOS=linux go build` produces something that does not start, so cross-builds go
+through containers.
+
+```bash
+# macOS, on a Mac
+CGO_ENABLED=1 GOARCH=arm64 go build -ldflags '-s -w' -o cogdebt-darwin-arm64 ./cmd/cogdebt
+CGO_ENABLED=1 GOARCH=amd64 go build -ldflags '-s -w' -o cogdebt-darwin-amd64 ./cmd/cogdebt
+lipo -create -output cogdebt-macos-universal cogdebt-darwin-arm64 cogdebt-darwin-amd64
+
+# Linux and Windows, needs Docker running
+go install github.com/fyne-io/fyne-cross@latest
+fyne-cross linux   -arch=amd64,arm64,386 -env GOTOOLCHAIN=auto -app-id=dev.cogdebt.app -name=cogdebt ./cmd/cogdebt
+fyne-cross windows -arch=amd64,arm64,386 -env GOTOOLCHAIN=auto -app-id=dev.cogdebt.app -name=cogdebt ./cmd/cogdebt
+```
+
+`-env GOTOOLCHAIN=auto` is required, not optional. The fyne-cross images ship an
+older Go with `GOTOOLCHAIN=local`, so without it every target fails with
+"requires go >= 1.27.1" before it compiles a line.
+
+Two things fyne-cross leaves in the working tree: `cmd/cogdebt/fyne_metadata_init.go`,
+which embeds a placeholder Fyne logo and must never be committed, and a stray
+`tmp-pkg/` and `cogdebt.tar.xz`. All of them are gitignored — check `git status`
+after a build run anyway.
+
+Upload with `gh release upload <tag> --clobber`, and regenerate `SHA256SUMS.txt`
+over the whole set rather than appending to it. Nothing is code-signed, so the
+release notes have to tell people how to get past Gatekeeper and SmartScreen;
+a download that silently refuses to open is the same as no download.
+
 ## Layout
 
 ```

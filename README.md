@@ -9,7 +9,7 @@ Plugin architecture in Go, desktop shell in Fyne, agents on Google ADK.
 | | |
 |---|---|
 | Pitch deck | **https://serbia-cursor-hackathon.onrender.com** |
-| macOS build | [v0.1.0 release](https://github.com/siriusfreak/serbia-cursor-hackathon/releases/tag/v0.1.0) — unsigned, see the notes for the quarantine flag |
+| Downloads | [releases](https://github.com/siriusfreak/serbia-cursor-hackathon/releases) — macOS, Linux and Windows, each on x86-64, ARM64 and 32-bit x86. Unsigned; the notes say how to get past Gatekeeper and SmartScreen. |
 | Evidence behind the deck | [`presentation/SOURCES.md`](presentation/SOURCES.md) |
 
 ## Running it
