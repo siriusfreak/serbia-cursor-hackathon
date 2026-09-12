@@ -38,8 +38,9 @@ Then go to slide 2. Do not explain the product name here.
 > system did not keep the expert knowledge, and because junior engineers had
 > nobody to learn from.
 >
-> And engineers write about this every month. We found twelve articles about it
-> on Hacker News between April and September."
+> And engineers write about this every month. We found nineteen articles about it
+> on Hacker News between April and August. Every one is listed with its link in
+> the repository."
 
 Point at the Nature line and the Ford line. Do not read the other four.
 
@@ -188,6 +189,9 @@ If the judges are not technical, say only the first two paragraphs.
 > What is next: ask the learner to predict the match before we show it, and keep
 > a list of every wrong belief.
 >
+> The source code is on GitHub, and there is a macOS build in the release. Both
+> links are on this slide.
+>
 > And then a shared debt list for a team. Because cognitive debt is not only an
 > individual problem. It is also what happens when the one engineer who
 > understood a service leaves the company.
@@ -221,6 +225,19 @@ Stop. Do not add a sentence after "thank you".
 > "One binary, no runtime to install, and the plugin model. Our ABI is three
 > methods over bytes, so a plugin runs in our process or in its own process with
 > the same code. Google's ADK has a Go SDK, so we lost nothing on the agent side."
+
+**"Where is the proof for the slide 2 numbers?"**
+> "`presentation/SOURCES.md` in the repository. It lists all nineteen stories with
+> a link to each Hacker News item, and it states the search terms we used. It also
+> says what the number is not: a keyword search, not a complete census. A
+> different set of terms returns a different number."
+
+**"Can we run it?"**
+> "The source is on GitHub, and there is a macOS build in the v0.1.0 release. The
+> binary is not signed, so remove the quarantine flag first — the release notes
+> give the command. There is no Linux or Windows build: the interface uses Fyne,
+> which needs cgo and OpenGL, and we could not cross-compile that from macOS
+> today. Build from source on those systems."
 
 **"Who pays for this?"**
 > "An individual pays because of fear. That is the Hacker News evidence. A company

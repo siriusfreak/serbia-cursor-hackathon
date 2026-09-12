@@ -223,6 +223,7 @@ a projector is a bad place for a long sentence.
 | the debt formula or the L1–L4 ladder | the formula slide and the ladder slide |
 | the UI, visibly | re-shoot `presentation/assets/app.png` with `-screenshot` |
 | any slide | the matching `## N · ` section in `presentation/SPEECH.md` |
+| a headline, a count or a date on a slide | the entry and the link in `presentation/SOURCES.md` |
 
 `design/deck_test.go` enforces most of this and fails `go test ./...` when it
 drifts: every colour in the deck must be in the app palette, the plugin table
@@ -230,6 +231,13 @@ must match `exts/` exactly in both directions, the ABI method count must match
 `abi.go`, every slide must carry `<aside class="notes">`, and `SPEECH.md` must
 have one numbered section per slide. It cannot check whether a sentence is still
 *true* — that part is yours.
+
+**Every factual claim on a slide needs a link in `presentation/SOURCES.md`.**
+A headline on a slide is a claim made in front of judges, and someone will ask
+for the proof. The test checks that each headline is cited, that the count the
+slide states equals the number of rows in the file, and that the date range on
+the slide covers the sources listed. It cannot check that a number is honestly
+derived — state the method in `SOURCES.md`, including what the number is not.
 
 Two rules the test cannot express. Numbers on slides are measured, never
 estimated: the 120s→34s figures came out of the tracing, so if you re-measure,

@@ -4,6 +4,9 @@ The cogdebt pitch deck for the Cursor Community Serbia Hackathon.
 
 **Live: https://serbia-cursor-hackathon.onrender.com**
 
+The binaries the last slide points at are the
+[v0.1.0 release](https://github.com/siriusfreak/serbia-cursor-hackathon/releases/tag/v0.1.0).
+
 Plain static HTML — no build step, no dependencies, no CDN. Open
 [`index.html`](index.html) in any browser.
 
@@ -31,15 +34,19 @@ likely thing to go wrong, and a PDF on a phone still gets you through the pitch.
 ```
 index.html        the deck — markup, styles and navigation in one file
 SPEECH.md         what to say, one numbered section per slide
+SOURCES.md        a link for every headline and number the slides claim
 assets/app.png    screenshot of the running app, used on the demo slide
 ```
 
 ## It is checked
 
 `design/deck_test.go` runs as part of `go test ./...` and fails when the deck
-drifts from the code: colours outside the app palette, a plugin table that no
-longer matches `exts/`, a wrong method count for the plugin ABI, a slide with no
-speaker notes, or a `SPEECH.md` missing a section for a slide.
+drifts from the code or from its evidence: colours outside the app palette, a
+plugin table that no longer matches `exts/`, a wrong method count for the plugin
+ABI, a slide with no speaker notes, a `SPEECH.md` missing a section for a slide,
+a headline that `SOURCES.md` does not cite, a claimed source count that does not
+equal the rows in `SOURCES.md`, or a repository link that is not this
+repository.
 
 See **“The pitch deck is part of the product”** in [`AGENTS.md`](../AGENTS.md)
 for what to update when the code changes.

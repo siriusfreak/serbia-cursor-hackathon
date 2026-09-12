@@ -6,8 +6,11 @@ a ladder of questions from borrowed intuition to standing on your own.
 
 Plugin architecture in Go, desktop shell in Fyne, agents on Google ADK.
 
-Pitch deck: **https://serbia-cursor-hackathon.onrender.com** — source and
-speaker notes in [`presentation/`](presentation/).
+| | |
+|---|---|
+| Pitch deck | **https://serbia-cursor-hackathon.onrender.com** |
+| macOS build | [v0.1.0 release](https://github.com/siriusfreak/serbia-cursor-hackathon/releases/tag/v0.1.0) — unsigned, see the notes for the quarantine flag |
+| Evidence behind the deck | [`presentation/SOURCES.md`](presentation/SOURCES.md) |
 
 ## Running it
 

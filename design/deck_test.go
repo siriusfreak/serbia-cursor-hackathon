@@ -26,8 +26,9 @@ import (
 // The type ramp is deliberately NOT checked against the app. A desktop window
 // reads at 14px and a projector does not; the deck has its own scale.
 const (
-	deckSrc   = "../presentation/index.html"
-	speechSrc = "../presentation/SPEECH.md"
+	deckSrc    = "../presentation/index.html"
+	speechSrc  = "../presentation/SPEECH.md"
+	sourcesSrc = "../presentation/SOURCES.md"
 )
 
 func deck(t *testing.T) string {
@@ -173,6 +174,106 @@ func tracked(t *testing.T, path string) bool {
 		return false
 	}
 	return true
+}
+
+// numberWords lets the slide say "nineteen" while SOURCES.md counts rows.
+var numberWords = map[int]string{
+	10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen",
+	15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+	20: "twenty", 21: "twenty-one", 22: "twenty-two", 23: "twenty-three",
+	24: "twenty-four", 25: "twenty-five",
+}
+
+// normalise flattens case, spacing and the dash characters a headline picks up
+// when it is retyped, so two spellings of one title still compare equal.
+func normalise(s string) string {
+	r := strings.NewReplacer("—", "-", "–", "-", "’", "'", "‘", "'", "\u00a0", " ")
+	return strings.Join(strings.Fields(strings.ToLower(r.Replace(s))), " ")
+}
+
+// TestEveryHeadlineOnTheSlidesIsCited is the check that would have caught a
+// real defect: the deck claimed a count and a date range that SOURCES.md did
+// not support. A headline on a slide is a factual claim in front of judges, so
+// it has to be traceable to a link somebody can open.
+func TestEveryHeadlineOnTheSlidesIsCited(t *testing.T) {
+	sources := normalise(readFile(t, sourcesSrc))
+
+	headline := regexp.MustCompile(`<span class="t">([^<]+)</span>`)
+	found := headline.FindAllStringSubmatch(deck(t), -1)
+	if len(found) == 0 {
+		t.Fatal("no headlines found on the slides; the parser is looking for the wrong markup")
+	}
+	for _, m := range found {
+		// Slides truncate a long title to fit the column, so compare on the
+		// opening of the title rather than the whole string.
+		want := normalise(m[1])
+		if len(want) > 40 {
+			want = want[:40]
+		}
+		if !strings.Contains(sources, want) {
+			t.Errorf("the slide shows %q but %s does not cite it", m[1], sourcesSrc)
+		}
+	}
+}
+
+// TestTheEvidenceCountMatchesTheSources pins the number the presenter says out
+// loud to the number of rows anyone can count in the file.
+func TestTheEvidenceCountMatchesTheSources(t *testing.T) {
+	rows := regexp.MustCompile(`(?m)^\| (\d{4}-\d{2}-\d{2}) \|`).FindAllStringSubmatch(readFile(t, sourcesSrc), -1)
+	n := len(rows)
+	if n < 5 {
+		t.Fatalf("%s lists %d dated sources; the table format changed", sourcesSrc, n)
+	}
+
+	word, ok := numberWords[n]
+	if !ok {
+		t.Fatalf("%s lists %d sources, which has no spelling in numberWords", sourcesSrc, n)
+	}
+	if want := "of " + word + " Hacker News stories"; !strings.Contains(deck(t), want) {
+		t.Errorf("%s lists %d sources, so a slide should say %q", sourcesSrc, n, want)
+	}
+	if !strings.Contains(readFile(t, speechSrc), word) {
+		t.Errorf("the deck claims %s sources but %s says a different number", word, speechSrc)
+	}
+
+	// The date range on the slide has to cover the sources actually listed.
+	first, last := rows[0][1], rows[0][1]
+	for _, r := range rows {
+		if r[1] < first {
+			first = r[1]
+		}
+		if r[1] > last {
+			last = r[1]
+		}
+	}
+	months := map[string]string{"01": "January", "02": "February", "03": "March", "04": "April",
+		"05": "May", "06": "June", "07": "July", "08": "August", "09": "September",
+		"10": "October", "11": "November", "12": "December"}
+	want := "between " + months[first[5:7]] + " and " + months[last[5:7]]
+	if !strings.Contains(deck(t), want) {
+		t.Errorf("the sources run from %s to %s, so the slide should say %q", first, last, want)
+	}
+}
+
+// TestTheDeckLinksToThisRepository keeps the address on the closing slide equal
+// to the repository the deck is committed in. A wrong link there is a judge who
+// cannot find the code.
+func TestTheDeckLinksToThisRepository(t *testing.T) {
+	out, err := exec.Command("git", "-C", "..", "remote", "get-url", "origin").Output()
+	if err != nil {
+		t.Skipf("no git remote to compare against: %v", err)
+	}
+	remote := strings.TrimSpace(string(out))
+	remote = strings.TrimSuffix(remote, ".git")
+	remote = strings.TrimPrefix(remote, "git@github.com:")
+	remote = strings.TrimPrefix(remote, "https://github.com/")
+	if remote == "" {
+		t.Skip("could not parse the remote")
+	}
+
+	if !strings.Contains(deck(t), "github.com/"+remote) {
+		t.Errorf("the slides do not link to github.com/%s", remote)
+	}
 }
 
 // TestDeckStillLeadsWithTheBreakdown: if the slides stop making the mandatory
