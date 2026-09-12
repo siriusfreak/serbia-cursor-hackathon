@@ -24,7 +24,7 @@ The same notes are inside the deck. Press **N** during the presentation.
 > not the database, and it is not the model. It is the person who must understand
 > what we built.
 >
-> We built cogdebt for that person."
+> We write a test harness for code. cogdebt is a harness for that person."
 
 Then go to slide 2. Do not explain the product name here.
 
