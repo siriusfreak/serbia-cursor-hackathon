@@ -26,6 +26,13 @@ type Config struct {
 	Bridge *Bridge
 	// Mastery supplies the progress panel after each turn. Optional.
 	Mastery func(context.Context) []ext.MasteryItem
+	// Analogies supplies every analogy stored for the learner, newest first.
+	//
+	// It is read from the store rather than from tool results because the
+	// analogy agent records its own pairs, and agenttool does not surface a
+	// sub-agent's tool events to the parent stream. The store is the one place
+	// both transports agree on.
+	Analogies func(context.Context) []ext.AnalogyRow
 	// Plugins is the loaded plugin summary, listed in the sidebar so the
 	// plugin layer is visible without opening a terminal.
 	Plugins []string
@@ -49,6 +56,8 @@ type Shell struct {
 	// streaming holds the assistant reply being built this turn.
 	streaming *strings.Builder
 	streamAt  int // index of the streaming widget in feed, -1 when idle
+	// shownAnalogies counts rows already drawn, so a turn renders only new ones.
+	shownAnalogies int
 }
 
 // New builds the window. Call Run to show it.
@@ -267,7 +276,22 @@ func (s *Shell) onViewEvent(ev ext.ViewEvent) {
 
 func (s *Shell) finishTurn() {
 	s.setBusy(false)
+	s.drawNewAnalogies()
 	s.refreshMastery()
+}
+
+// drawNewAnalogies appends a card for anything recorded since the last turn.
+func (s *Shell) drawNewAnalogies() {
+	if s.cfg.Analogies == nil {
+		return
+	}
+	rows := s.cfg.Analogies(s.ctx)
+	if len(rows) <= s.shownAnalogies {
+		return
+	}
+	fresh := rows[:len(rows)-s.shownAnalogies] // newest first
+	s.shownAnalogies = len(rows)
+	s.AppendView(ext.View(ext.ViewAnalogyTable, "", ext.AnalogyTableProps{Rows: fresh}))
 }
 
 func (s *Shell) refreshMastery() {

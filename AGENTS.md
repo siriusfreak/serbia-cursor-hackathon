@@ -77,6 +77,66 @@ window when you can capture it yourself.
 - **`go mod tidy` on a cold cache takes many minutes.** `GOFLAGS=-mod=mod go
   build ./...` resolves only what is imported and is far faster while iterating.
 
+## Logging is structured, and every seam is timed
+
+This pipeline puts an LLM, a subprocess and a GUI in one call path. When a run
+misbehaves the only useful question is *which seam, and how long did it sit
+there* — and a GUI leaves no scrollback to answer it from afterwards. So:
+
+- **Every log record is structured.** No formatted prose. Use the field and
+  event constants in `internal/obs`, never bare strings, so a query written once
+  keeps working.
+- **Every seam is timed.** `obs.Start()` at the boundary, `timer.Attr()` in the
+  record. Durations are milliseconds to one decimal — whole milliseconds hide
+  the difference between a 0.2ms in-process call and a 0.9ms one, which is
+  exactly the comparison the transport work exists to make.
+- **Add new seams to `internal/obs` first.** A new `Event*` constant, then the
+  call site. If you find yourself writing `log.Info("did the thing")` with no
+  event and no duration, that record will not help anyone at 3am.
+
+What is already instrumented: plugin load and rejection, every tool invocation
+(both at the ADK boundary and inside `extTool`, so framework overhead is
+separable from plugin cost), every model call with token counts and streamed
+chunk counts, agent runs, subprocess spawn/call/exit, and whole UI turns.
+
+```bash
+go run ./cmd/cogdebt -cli -log-format json -log-file /tmp/run.jsonl -log-level debug
+```
+
+Then sort by `ms` and read the top of the list. That is how the analogy agent
+was found to be 89% of a turn.
+
+Two traps in the callbacks themselves, both already handled — do not reintroduce
+them:
+
+- **`AfterModelCallback` fires once per streamed chunk, not once per call.**
+  Closing the span on the first one emits hundreds of 0ms records and buries the
+  real measurement. Check `resp.Partial` and only close on the final response.
+- **Runner-level lifecycle plugins do not see inside an `agenttool` sub-agent.**
+  Its model calls are invisible from the runner, which left the largest span in
+  the system unexplained. `obs.AgentCallbacks` is attached when the sub-agent is
+  built, in `Toolset.agentTool`.
+
+## Model choice is per-agent, and it is the biggest lever you have
+
+`AgentSpec.Model` picks a model per agent plugin; `Toolset.ModelFor` builds it.
+Use it. Measured on this workload, tracing a single turn:
+
+| | before | after |
+|---|---|---|
+| whole turn | 120s | 34s |
+| the analogy sub-agent | 84s | 7.4s |
+
+The analogy agent follows a procedure that is written out for it in full, so
+reasoning tokens buy nothing and cost almost the entire turn — a reply of 4069
+tokens at 74 seconds, against an instruction asking for three short pairs. A
+non-reasoning model produced cleaner structure in a tenth of the time. An agent
+that *decides* what to do next is the opposite case and should keep a reasoning
+model; the root agent still runs on `COGDEBT_MODEL`.
+
+`MaxOutputTokens` on the spec is the other half. Prose about length is advice a
+model may ignore.
+
 ## Layout
 
 ```

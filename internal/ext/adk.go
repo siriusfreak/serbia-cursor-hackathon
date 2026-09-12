@@ -16,6 +16,8 @@ import (
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/agenttool"
 	"google.golang.org/adk/v2/tool/toolutils"
+
+	"github.com/sirius/cogdebt/internal/obs"
 )
 
 // SchemaFromJSON converts a plugin's JSON Schema into the schema type the model
@@ -94,17 +96,32 @@ func (t *extTool) Run(ctx agent.Context, args any) (map[string]any, error) {
 		return faultResult(Internalf("could not encode arguments: %v", err)), nil
 	}
 
+	// Timed separately from the ADK-level span so the plugin's own cost is
+	// distinguishable from framework overhead -- which is the whole comparison
+	// when the same plugin can run in-process or behind an RPC boundary.
+	timer := obs.Start()
 	out, err := t.ext.Invoke(ctx, t.spec.Name, in)
+	elapsed := timer.Ms()
+
 	if err != nil {
 		var f *Fault
 		if errors.As(err, &f) {
+			t.log.Debug("plugin returned fault",
+				obs.FEvent, obs.EventToolInvoke, obs.FPlugin, t.plugin, obs.FTool, t.spec.Name,
+				obs.FMs, elapsed, obs.FFault, f.Code, "message", f.Message)
 			return faultResult(f), nil
 		}
 		// Not a Fault: transport or programming breakage. Tell the model
 		// something useful, but make sure a human sees it too.
-		t.log.Error("plugin invoke failed", "tool", t.Name(), "err", err)
+		t.log.Error("plugin invoke failed",
+			obs.FEvent, obs.EventToolInvoke, obs.FPlugin, t.plugin, obs.FTool, t.spec.Name,
+			obs.FMs, elapsed, obs.FErr, err.Error())
 		return faultResult(Internalf("tool %q failed: %v", t.Name(), err)), nil
 	}
+
+	t.log.Debug("plugin invoke ok",
+		obs.FEvent, obs.EventToolInvoke, obs.FPlugin, t.plugin, obs.FTool, t.spec.Name,
+		obs.FMs, elapsed, obs.FBytesIn, len(in), obs.FBytesOut, len(out))
 
 	var res map[string]any
 	if err := json.Unmarshal(out, &res); err == nil {
@@ -133,6 +150,13 @@ type ToolsetConfig struct {
 	Registry *Registry
 	// Model is the default model for agent plugins that do not name one.
 	Model model.LLM
+	// ModelFor builds a model by name, for agent plugins that do name one.
+	//
+	// Model choice is per-agent because the right model is task-shaped: an
+	// agent following a detailed procedure wants a fast non-reasoning model,
+	// while one deciding what to do next needs to think. Measured on this
+	// workload, that difference was 6x in latency.
+	ModelFor func(name string) (model.LLM, error)
 	// MaxAgentDepth caps nesting of agent plugins. Zero means 2. Without a cap,
 	// agent plugins referencing each other recurse until the token budget is
 	// gone.
@@ -153,6 +177,7 @@ type Toolset struct {
 	mu     sync.Mutex
 	agents map[string]tool.Tool // plugin name -> built agent tool, cached by version
 	built  map[string]string    // plugin name -> version the cache was built from
+	models map[string]model.LLM // model name -> client, built on first use
 }
 
 // NewToolset returns a Toolset over the registry.
@@ -168,6 +193,7 @@ func NewToolset(cfg ToolsetConfig) *Toolset {
 		log:    cfg.Log,
 		agents: map[string]tool.Tool{},
 		built:  map[string]string{},
+		models: map[string]model.LLM{},
 	}
 }
 
@@ -244,12 +270,37 @@ func (ts *Toolset) agentTool(ctx agent.ReadonlyContext, m Manifest, path []strin
 		return nil, err
 	}
 
+	llm := ts.cfg.Model
+	if spec.Model != "" && ts.cfg.ModelFor != nil {
+		switch chosen, err := ts.modelNamed(spec.Model); {
+		case err != nil:
+			// A named model that cannot be built is not worth failing the agent
+			// over; fall back and say so.
+			ts.log.Warn("agent model unavailable, using the default",
+				obs.FPlugin, m.Name, obs.FModel, spec.Model, obs.FErr, err.Error())
+		default:
+			llm = chosen
+		}
+	}
+
+	// Runner-level tracing stops at the agenttool boundary, so a sub-agent has
+	// to carry its own.
+	beforeModel, afterModel := obs.AgentCallbacks(ts.log)
+
+	var genCfg *genai.GenerateContentConfig
+	if spec.MaxOutputTokens > 0 {
+		genCfg = &genai.GenerateContentConfig{MaxOutputTokens: spec.MaxOutputTokens}
+	}
+
 	ag, err := llmagent.New(llmagent.Config{
-		Name:        m.Name, // plugin name wins, so the exposed tool is predictable
-		Description: spec.Description,
-		Instruction: spec.Instruction,
-		Model:       ts.cfg.Model,
-		Tools:       tools,
+		Name:                  m.Name, // plugin name wins, so the exposed tool is predictable
+		GenerateContentConfig: genCfg,
+		Description:           spec.Description,
+		Instruction:           spec.Instruction,
+		Model:                 llm,
+		Tools:                 tools,
+		BeforeModelCallbacks:  []llmagent.BeforeModelCallback{beforeModel},
+		AfterModelCallbacks:   []llmagent.AfterModelCallback{afterModel},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build agent: %w", err)
@@ -261,6 +312,22 @@ func (ts *Toolset) agentTool(ctx agent.ReadonlyContext, m Manifest, path []strin
 	ts.built[m.Name] = m.Version
 	ts.mu.Unlock()
 	return at, nil
+}
+
+// modelNamed builds a model once and reuses it: agent plugins are rebuilt
+// whenever their version changes, and a client per rebuild would leak.
+func (ts *Toolset) modelNamed(name string) (model.LLM, error) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	if m, ok := ts.models[name]; ok {
+		return m, nil
+	}
+	m, err := ts.cfg.ModelFor(name)
+	if err != nil {
+		return nil, err
+	}
+	ts.models[name] = m
+	return m, nil
 }
 
 // resolveRefs turns qualified tool names into ADK tools. An unresolvable name

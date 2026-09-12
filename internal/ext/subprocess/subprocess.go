@@ -29,6 +29,7 @@ import (
 	goplugin "github.com/hashicorp/go-plugin"
 
 	"github.com/sirius/cogdebt/internal/ext"
+	"github.com/sirius/cogdebt/internal/obs"
 )
 
 // pluginKey names the single service a plugin binary serves.
@@ -53,14 +54,17 @@ func Serve(e ext.Extension) {
 }
 
 // extPlugin adapts ext.Extension to go-plugin's two-sided interface.
-type extPlugin struct{ impl ext.Extension }
+type extPlugin struct {
+	impl ext.Extension
+	log  *slog.Logger
+}
 
 func (p *extPlugin) Server(*goplugin.MuxBroker) (any, error) {
 	return &rpcServer{impl: p.impl}, nil
 }
 
 func (p *extPlugin) Client(_ *goplugin.MuxBroker, c *rpc.Client) (any, error) {
-	return &rpcClient{client: c}, nil
+	return &rpcClient{client: c, log: p.log}, nil
 }
 
 // InvokeArgs and InvokeReply are the wire types.
@@ -117,6 +121,7 @@ func (s *rpcServer) Close(_ any, _ *struct{}) error { return s.impl.Close() }
 type rpcClient struct {
 	client   *rpc.Client
 	manifest *ext.Manifest
+	log      *slog.Logger
 }
 
 func (c *rpcClient) Manifest() ext.Manifest {
@@ -139,8 +144,14 @@ func (c *rpcClient) Manifest() ext.Manifest {
 }
 
 func (c *rpcClient) Invoke(_ context.Context, tool string, in json.RawMessage) (json.RawMessage, error) {
+	timer := obs.Start()
 	var reply InvokeReply
-	if err := c.client.Call("Plugin.Invoke", InvokeArgs{Tool: tool, In: in}, &reply); err != nil {
+	err := c.client.Call("Plugin.Invoke", InvokeArgs{Tool: tool, In: in}, &reply)
+	obs.Or(c.log).Debug("rpc round trip",
+		obs.FEvent, obs.EventSubprocCall, obs.FTool, tool,
+		obs.FMs, timer.Ms(), obs.FBytesIn, len(in), obs.FBytesOut, len(reply.Out),
+		obs.FOK, err == nil)
+	if err != nil {
 		// The transport broke, most likely the subprocess died. Say so in a way
 		// the model can act on rather than retrying forever.
 		return nil, &ext.Fault{
@@ -166,19 +177,25 @@ func (c *rpcClient) Close() error {
 type managed struct {
 	ext.Extension
 	client *goplugin.Client
+	log    *slog.Logger
+	path   string
 }
 
 func (m *managed) Close() error {
 	err := m.Extension.Close()
 	m.client.Kill()
+	obs.Or(m.log).Info("plugin process stopped",
+		obs.FEvent, obs.EventSubprocExit, obs.FPath, m.path, obs.FOK, err == nil)
 	return err
 }
 
 // Load starts the plugin binary at path and returns it as an Extension.
-func Load(path string) (ext.Extension, error) {
+func Load(path string, log *slog.Logger) (ext.Extension, error) {
+	log = obs.Or(log)
+	timer := obs.Start()
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: Handshake,
-		Plugins:         goplugin.PluginSet{pluginKey: &extPlugin{}},
+		Plugins:         goplugin.PluginSet{pluginKey: &extPlugin{log: log}},
 		Cmd:             exec.Command(path),
 		// go-plugin logs its handshake chatter at debug; silence it and let
 		// the host's own logger report what matters.
@@ -201,7 +218,10 @@ func Load(path string) (ext.Extension, error) {
 		client.Kill()
 		return nil, fmt.Errorf("%s served an unexpected type %T", filepath.Base(path), raw)
 	}
-	return &managed{Extension: proxy, client: client}, nil
+	log.Info("plugin process started",
+		obs.FEvent, obs.EventSubprocSpawn, obs.FPath, path,
+		obs.FPlugin, proxy.Manifest().Name, timer.Attr())
+	return &managed{Extension: proxy, client: client, log: log, path: path}, nil
 }
 
 // LoadDir starts every executable in dir, registers it, and returns the plugin
@@ -238,7 +258,7 @@ func LoadDir(reg *ext.Registry, dir string, log *slog.Logger) []string {
 	var loaded []string
 	for _, name := range names {
 		path := filepath.Join(dir, name)
-		e, err := Load(path)
+		e, err := Load(path, log)
 		if err != nil {
 			log.Error("out-of-process plugin not started", "path", path, "err", err)
 			continue

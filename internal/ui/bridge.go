@@ -2,12 +2,15 @@ package ui
 
 import (
 	"context"
+	"log/slog"
 
 	"fyne.io/fyne/v2"
 	"google.golang.org/genai"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/runner"
+
+	"github.com/sirius/cogdebt/internal/obs"
 )
 
 // Handler receives agent output. Every callback is invoked on the Fyne UI
@@ -39,6 +42,9 @@ type Bridge struct {
 	Runner    *runner.Runner
 	UserID    string
 	SessionID string
+	// Log records turn timings. A GUI leaves no scrollback, so without this a
+	// slow or failed turn is unexplainable after the fact.
+	Log *slog.Logger
 }
 
 // Send delivers the learner's message and streams the reply. It returns
@@ -47,10 +53,28 @@ func (b *Bridge) Send(ctx context.Context, text string, h Handler) {
 	go func() {
 		defer post(h.OnDone)
 
+		log := obs.Or(b.Log)
+		timer := obs.Start()
+		var tools, chunks int
+		var failed bool
+
+		log.Info("turn started",
+			obs.FEvent, obs.EventTurn, obs.FUser, b.UserID, obs.FSession, b.SessionID,
+			obs.FBytesIn, len(text))
+		defer func() {
+			log.Info("turn finished",
+				obs.FEvent, obs.EventTurn, obs.FUser, b.UserID, obs.FSession, b.SessionID,
+				timer.Attr(), "tool_calls", tools, "chunks", chunks, obs.FOK, !failed)
+		}()
+
 		msg := genai.NewContentFromText(text, genai.RoleUser)
 		for ev, err := range b.Runner.Run(ctx, b.UserID, b.SessionID, msg, agent.RunConfig{}) {
 			if err != nil {
 				if ctx.Err() == nil {
+					failed = true
+					log.Error("turn failed",
+						obs.FEvent, obs.EventTurn, obs.FSession, b.SessionID,
+						timer.Attr(), obs.FErr, err.Error())
 					postErr(h.OnError, err)
 				}
 				return
@@ -66,6 +90,7 @@ func (b *Bridge) Send(ctx context.Context, text string, h Handler) {
 				}
 				switch {
 				case part.Text != "":
+					chunks++
 					text := part.Text
 					post(func() {
 						if h.OnText != nil {
@@ -73,6 +98,7 @@ func (b *Bridge) Send(ctx context.Context, text string, h Handler) {
 						}
 					})
 				case part.FunctionCall != nil:
+					tools++
 					name := part.FunctionCall.Name
 					post(func() {
 						if h.OnToolCall != nil {

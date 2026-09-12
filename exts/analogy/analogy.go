@@ -13,9 +13,20 @@ package analogy
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/sirius/cogdebt/internal/ext"
 )
+
+// defaultAnalogyModel is overridable with COGDEBT_ANALOGY_MODEL.
+var defaultAnalogyModel = envOr("COGDEBT_ANALOGY_MODEL", "grok-4.20-0309-non-reasoning")
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
 
 // Ext is a declarative agent plugin.
 type Ext struct {
@@ -36,7 +47,16 @@ func New() *Ext {
 			// The agent that produces the pairs is the one that records them.
 			// Leaving that to the caller means it is skipped whenever the reply
 			// is long, and the table never reaches the screen.
-			ToolRefs: []string{"profile_get", "profile_save_analogy"},
+			// This agent executes a procedure that is spelled out for it, so
+			// reasoning tokens buy nothing and cost most of the turn. Measured
+			// on this task: 26.5s with reasoning against 4.5s without, and the
+			// faster model produced the cleaner structure as well.
+			Model: defaultAnalogyModel,
+			// Prose about length is advice a model may ignore; this is the
+			// lever that holds. Tracing caught a 4069-token reply that took
+			// 74 seconds against an instruction asking for three short pairs.
+			MaxOutputTokens: 1600,
+			ToolRefs:        []string{"profile_get", "profile_save_analogy"},
 		},
 	}
 }
@@ -78,7 +98,9 @@ breakdown must never be empty. An analogy without a stated limit does not pay of
 it creates new debt, because the learner keeps the borrowed intuition past the point it holds.
 If you cannot name a way the analogy fails, the pairing is too vague -- replace it.
 
-Produce three to five pairs, strongest first. Be concrete: name real mechanisms, not categories.
+Produce exactly three pairs, strongest first. Be concrete: name real mechanisms, not categories.
+Keep carry_over and breakdown to one or two sentences each -- depth comes from choosing the right
+pair, not from length, and a learner waiting on a wall of text has already stopped reading.
 
 Then, before you answer, call profile_save_analogy with those pairs. That is what puts the table
 on the learner's screen and stores it; skipping it means your work is never shown. After the call,

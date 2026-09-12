@@ -200,9 +200,17 @@ func score(repos []repo) []concept {
 		top = max(top, w)
 	}
 
+	// Repository topics are a mix of real technologies and project names
+	// ("tv-backlight"). A low share is the best available signal that a tag is
+	// incidental, and passing those through pollutes the debt list with things
+	// the learner does not lean on at all.
+	const floor = 0.35
+
 	out := make([]concept, 0, len(weights))
 	for name, w := range weights {
-		out = append(out, concept{Name: name, Frequency: w / top, Repos: counts[name]})
+		if f := w / top; f >= floor {
+			out = append(out, concept{Name: name, Frequency: f, Repos: counts[name]})
+		}
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Frequency != out[j].Frequency {
@@ -210,8 +218,8 @@ func score(repos []repo) []concept {
 		}
 		return out[i].Name < out[j].Name
 	})
-	if len(out) > 20 {
-		out = out[:20]
+	if len(out) > 12 {
+		out = out[:12]
 	}
 	return out
 }

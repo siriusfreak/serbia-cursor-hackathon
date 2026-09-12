@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/sirius/cogdebt/internal/obs"
 )
 
 // nameRe constrains plugin and tool names so that the qualified form
@@ -59,6 +61,7 @@ func NewRegistry(log *slog.Logger) *Registry {
 // Load validates a plugin and adds it. On failure the plugin is not added and
 // the error explains why; callers normally log and carry on.
 func (r *Registry) Load(e Extension) error {
+	timer := obs.Start()
 	m := e.Manifest()
 	if err := ValidateManifest(m); err != nil {
 		return fmt.Errorf("plugin %q rejected: %w", m.Name, err)
@@ -84,7 +87,13 @@ func (r *Registry) Load(e Extension) error {
 		r.taken[QualifiedName(m.Name, ts.Name)] = m.Name
 	}
 	r.entries = append(r.entries, entry{ext: e, manifest: m})
-	r.log.Info("plugin loaded", "name", m.Name, "version", m.Version, "kind", string(m.Kind), "tools", len(m.Provides))
+	r.log.Info("plugin loaded",
+		obs.FEvent, obs.EventPluginLoad,
+		obs.FPlugin, m.Name,
+		obs.FVersion, m.Version,
+		obs.FKind, string(m.Kind),
+		obs.FCount, len(m.Provides),
+		timer.Attr())
 	return nil
 }
 
@@ -93,7 +102,12 @@ func (r *Registry) Load(e Extension) error {
 func (r *Registry) MustLoad(exts ...Extension) {
 	for _, e := range exts {
 		if err := r.Load(e); err != nil {
-			r.log.Error("plugin not loaded", "err", err)
+			// A rejected plugin is a normal outcome, not a crash. Record it
+			// with the same shape as a successful load so both are queryable.
+			r.log.Error("plugin not loaded",
+				obs.FEvent, obs.EventPluginReject,
+				obs.FPlugin, e.Manifest().Name,
+				obs.FErr, err.Error())
 		}
 	}
 }

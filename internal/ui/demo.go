@@ -64,6 +64,19 @@ func (s *Shell) refreshMasteryWith(items []ext.MasteryItem) {
 	s.side.Refresh()
 }
 
+// Ask submits text as if the learner had typed it, once the window has settled.
+// It drives scripted live runs, so the real streaming and card-rendering paths
+// can be exercised and screenshotted without a human at the keyboard.
+func (s *Shell) Ask(text string, after time.Duration) {
+	go func() {
+		time.Sleep(after)
+		fyne.Do(func() {
+			s.input.SetText(text)
+			s.submit()
+		})
+	}()
+}
+
 // RunAndCapture shows the window, saves a PNG once it has settled, and exits.
 // The capture runs on the UI goroutine because the canvas belongs to it.
 func (s *Shell) RunAndCapture(path string, after time.Duration) error {

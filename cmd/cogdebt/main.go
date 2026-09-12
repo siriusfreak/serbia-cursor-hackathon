@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/model/openaimodel"
+	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
@@ -33,6 +35,7 @@ import (
 	"github.com/sirius/cogdebt/internal/domain"
 	"github.com/sirius/cogdebt/internal/ext"
 	"github.com/sirius/cogdebt/internal/ext/subprocess"
+	"github.com/sirius/cogdebt/internal/obs"
 	"github.com/sirius/cogdebt/internal/store"
 	"github.com/sirius/cogdebt/internal/ui"
 )
@@ -77,24 +80,33 @@ func main() {
 		user    = flag.String("user", "local", "learner id")
 		naive   = flag.Bool("naive", false, "also load the naive analogy plugin, for comparison")
 		cli     = flag.Bool("cli", false, "terminal REPL instead of the desktop window")
-		shot    = flag.String("screenshot", "", "fill the window with sample content, save a PNG here and exit")
-		debug   = flag.Bool("debug", false, "log plugin loading and tool calls")
+		shot    = flag.String("screenshot", "", "save a PNG of the window here and exit")
+		say     = flag.String("say", "", "submit this message on startup, for a scripted live run")
+		after   = flag.Duration("shot-after", 1200*time.Millisecond, "how long to wait before the screenshot")
+		debug   = flag.Bool("debug", false, "shorthand for -log-level debug")
+		logLvl  = flag.String("log-level", "info", "debug, info, warn or error")
+		logFmt  = flag.String("log-format", "text", "text or json; use json when you intend to query the output")
+		logFile = flag.String("log-file", "", "also append structured logs to this file")
 	)
 	flag.Parse()
 
-	level := slog.LevelWarn
 	if *debug {
-		level = slog.LevelDebug
+		*logLvl = "debug"
 	}
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	log, closeLog, err := obs.Setup(obs.Config{Level: *logLvl, Format: *logFmt, File: *logFile})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "logging: %v\n", err)
+		os.Exit(1)
+	}
+	defer closeLog()
 
-	if err := run(*dbPath, *plugDir, *user, *naive, *cli, *shot, log); err != nil {
+	if err = run(*dbPath, *plugDir, *user, *naive, *cli, *shot, *say, *after, log); err != nil {
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dbPath, pluginDir, userID string, naive, cli bool, shot string, log *slog.Logger) error {
+func run(dbPath, pluginDir, userID string, naive, cli bool, shot, say string, after time.Duration, log *slog.Logger) error {
 	loadDotEnv(".env")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -136,7 +148,12 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot string, log *sl
 		reg.MustLoad(analogy.NewNaive())
 	}
 
-	toolset := ext.NewToolset(ext.ToolsetConfig{Registry: reg, Model: llm, Log: log})
+	toolset := ext.NewToolset(ext.ToolsetConfig{
+		Registry: reg,
+		Model:    llm,
+		ModelFor: func(name string) (model.LLM, error) { return buildNamedModel(ctx, name) },
+		Log:      log,
+	})
 
 	// The root agent is given one Toolset and never learns that plugins exist.
 	root, err := llmagent.New(llmagent.Config{
@@ -150,17 +167,25 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot string, log *sl
 		return fmt.Errorf("build root agent: %w", err)
 	}
 
+	// The runner owns the agent loop, so model and tool spans are only visible
+	// from inside it. This lifecycle plugin is how they get out.
+	tracer, err := obs.Tracer(log)
+	if err != nil {
+		return fmt.Errorf("build tracer: %w", err)
+	}
+
 	r, err := runner.New(runner.Config{
 		AppName:           "cogdebt",
 		Agent:             root,
 		SessionService:    session.InMemoryService(),
 		AutoCreateSession: true,
+		PluginConfig:      runner.PluginConfig{Plugins: []*plugin.Plugin{tracer}},
 	})
 	if err != nil {
 		return fmt.Errorf("build runner: %w", err)
 	}
 
-	bridge := &ui.Bridge{Runner: r, UserID: userID, SessionID: "main"}
+	bridge := &ui.Bridge{Runner: r, UserID: userID, SessionID: "main", Log: log}
 
 	if cli {
 		printBanner(reg, toolset, transport)
@@ -168,14 +193,22 @@ func run(dbPath, pluginDir, userID string, naive, cli bool, shot string, log *sl
 	}
 
 	shell := ui.New(ctx, ui.Config{
-		Model:   modelName(),
-		Bridge:  bridge,
-		Mastery: masteryPanel(db, userID),
-		Plugins: pluginSummary(reg),
+		Model:     modelName(),
+		Bridge:    bridge,
+		Mastery:   masteryPanel(db, userID),
+		Analogies: analogyPanel(db, userID),
+		Plugins:   pluginSummary(reg),
 	})
-	if shot != "" {
+	switch {
+	case say != "":
+		// A scripted live run: real model, real plugins, no sample content.
+		shell.Ask(say, 1200*time.Millisecond)
+	case shot != "":
+		// A preview: sample content, no model call.
 		shell.Seed()
-		return shell.RunAndCapture(shot, 1200*time.Millisecond)
+	}
+	if shot != "" {
+		return shell.RunAndCapture(shot, after)
 	}
 	shell.Run()
 	return nil
@@ -190,14 +223,54 @@ func masteryPanel(db *store.Store, userID string) func(context.Context) []ext.Ma
 		}
 		items := make([]ext.MasteryItem, 0, len(rows))
 		for _, cm := range rows {
-			items = append(items, ext.MasteryItem{
-				Label: cm.Concept.Name,
-				Level: cm.Mastery.Level,
-				Debt:  domain.Debt(cm.Mastery, 1),
-			})
+			debt := domain.Debt(cm.Mastery, 1)
+			// A scan turns up plenty of incidental tags. Show only what the
+			// learner has started on or is actually paying for; the rest is
+			// noise in a panel that is meant to be read at a glance.
+			if cm.Mastery.Level == 0 && debt < 0.4 {
+				continue
+			}
+			items = append(items, ext.MasteryItem{Label: cm.Concept.Name, Level: cm.Mastery.Level, Debt: debt})
+		}
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].Debt != items[j].Debt {
+				return items[i].Debt > items[j].Debt
+			}
+			return items[i].Level > items[j].Level
+		})
+		if len(items) > 8 {
+			items = items[:8]
 		}
 		return items
 	}
+}
+
+// analogyPanel reads stored analogies for the learner, newest first.
+func analogyPanel(db *store.Store, userID string) func(context.Context) []ext.AnalogyRow {
+	return func(ctx context.Context) []ext.AnalogyRow {
+		saved, err := db.Mappings(ctx, userID)
+		if err != nil {
+			return nil
+		}
+		rows := make([]ext.AnalogyRow, 0, len(saved))
+		for _, m := range saved {
+			rows = append(rows, ext.AnalogyRow{
+				Source:     m.Source.Name,
+				Target:     m.Target.Name,
+				SharedRole: string(m.SharedRole),
+				CarryOver:  first(m.CarryOver),
+				Breakdown:  first(m.Breakdown),
+			})
+		}
+		return rows
+	}
+}
+
+func first(ss []string) string {
+	if len(ss) == 0 {
+		return ""
+	}
+	return ss[0]
 }
 
 // pluginSummary lists what loaded, shown in the window footer so the plugin
@@ -209,6 +282,17 @@ func pluginSummary(reg *ext.Registry) []string {
 		out = append(out, fmt.Sprintf("%s %s (%s)", m.Name, m.Version, m.Kind))
 	}
 	return out
+}
+
+// buildNamedModel builds a model an agent plugin asked for by name, against the
+// same endpoint as the default.
+func buildNamedModel(ctx context.Context, name string) (model.LLM, error) {
+	key := firstNonEmpty(os.Getenv("XAI_API_KEY"), os.Getenv("OPENAI_API_KEY"))
+	if key == "" {
+		return nil, errors.New("no API key")
+	}
+	base := firstNonEmpty(os.Getenv("XAI_BASE_URL"), "https://api.x.ai/v1")
+	return openaimodel.NewModel(ctx, name, &openaimodel.ClientConfig{APIKey: key, BaseURL: base})
 }
 
 // modelName is the model id, overridable from the environment.

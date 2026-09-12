@@ -31,6 +31,14 @@ type AgentSpec struct {
 	// OutputSchema constrains the agent's reply. Informational for now.
 	OutputSchema json.RawMessage `json:"output_schema,omitempty"`
 
+	// MaxOutputTokens caps the agent's reply. Zero means no cap.
+	//
+	// Prose instructions about length are advice a model may ignore; this is
+	// the only lever that holds. Tracing showed one analogy reply at 5924
+	// tokens and 92 seconds -- 89% of the turn -- against an instruction
+	// asking for three short pairs.
+	MaxOutputTokens int32 `json:"max_output_tokens,omitempty"`
+
 	// SkipSummarization drops the extra LLM call that rewrites this agent's
 	// result for its parent. Set it true for cheap deterministic agents:
 	// leaving it false silently doubles cost and latency per delegation.

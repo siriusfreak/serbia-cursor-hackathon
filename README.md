@@ -117,3 +117,15 @@ go test ./exts/...
 
 Default model is `grok-4.6`; override with `COGDEBT_MODEL`. Any
 OpenAI-compatible endpoint works through `XAI_BASE_URL`.
+
+Model choice is per-agent: the analogy agent runs a non-reasoning model
+(`COGDEBT_ANALOGY_MODEL`, default `grok-4.20-0309-non-reasoning`) because it
+follows a procedure that is spelled out for it, and reasoning there cost 84s of
+a 120s turn for no gain in quality. Structured logs are how that was found:
+
+```bash
+go run ./cmd/cogdebt -cli -log-format json -log-file /tmp/run.jsonl
+```
+
+Every seam is timed — plugin loads, tool calls, model calls with token counts,
+subprocess round trips, whole turns. Sort by `ms` and read the top.
