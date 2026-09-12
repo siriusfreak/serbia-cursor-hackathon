@@ -1,6 +1,6 @@
 # presentation
 
-The cogdebt pitch deck for the Cursor Community Serbia Hackathon, by team BinSearch.
+The cogdebt pitch deck for the Grok Bot Serbia Hackathon, by team BinSearch.
 
 **Live: https://serbia-cursor-hackathon.onrender.com**
 

@@ -173,11 +173,11 @@ If the judges are not technical, say only the first two paragraphs.
 
 ## 10 · Partner technologies, and what is next
 
-> "Six of the ten partner technologies, and each one has a real job.
+> "Seven of the ten partner technologies, and each one has a real job.
 >
 > x.ai runs the tutor. Daytona runs the learner's code. fal draws the analogy.
 > Exa finds a source and Firecrawl reads it. Render serves these slides, from the
-> same repository.
+> same repository. And we built all of it in Grok Bot.
 >
 > We did not use three of them, and I will say so. Convex stores state on a
 > server, and we keep state on the learner's disk. Wonder and Wispr Flow do not
