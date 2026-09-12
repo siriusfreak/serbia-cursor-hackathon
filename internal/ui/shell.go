@@ -70,6 +70,12 @@ type Shell struct {
 	shownAnalogies int
 	// cyrillic is set once the learner writes in Cyrillic. See phrase.
 	cyrillic bool
+	// liveQuestions retires question cards that are still forms. A learner who
+	// answers in the message box below, or who is simply asked something new,
+	// leaves the old card live otherwise -- and a live card can be answered a
+	// second time, which the assessor would grade as a second attempt at a
+	// question it asked once.
+	liveQuestions []func()
 }
 
 // New builds the window. Call Run to show it.
@@ -192,6 +198,9 @@ func (s *Shell) submit() {
 		return
 	}
 	s.input.SetText("")
+	// Whatever was on screen has been answered, or abandoned. Either way it is
+	// no longer a form.
+	s.retireQuestions()
 	s.appendUser(text)
 	s.setBusy(true)
 
@@ -301,8 +310,26 @@ func (s *Shell) appendToolResult(name string, result map[string]any) {
 
 // AppendView renders a ViewSpec from a UI plugin into the feed.
 func (s *Shell) AppendView(spec ext.ViewSpec) {
+	if spec.Type == ext.ViewQuestion {
+		// Only one question is open at a time, because the assessor only parks
+		// one. A new card arriving means the last one is no longer answerable.
+		s.retireQuestions()
+		card, retire := renderQuestionCard(spec, s.onViewEvent)
+		s.liveQuestions = append(s.liveQuestions, retire)
+		s.feed.Add(container.NewPadded(card))
+		s.bump()
+		return
+	}
 	s.feed.Add(container.NewPadded(Render(spec, s.onViewEvent)))
 	s.bump()
+}
+
+// retireQuestions turns every open card back into a record of what was asked.
+func (s *Shell) retireQuestions() {
+	for _, retire := range s.liveQuestions {
+		retire()
+	}
+	s.liveQuestions = nil
 }
 
 func (s *Shell) onViewEvent(ev ext.ViewEvent) {

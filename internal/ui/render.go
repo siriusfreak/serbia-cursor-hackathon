@@ -153,6 +153,21 @@ func analogyDoors(r ext.AnalogyRow, emit func(ext.ViewEvent)) fyne.CanvasObject 
 }
 
 func renderQuestion(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
+	card, _ := renderQuestionCard(v, emit)
+	return card
+}
+
+// renderQuestionCard builds a question, and hands back the way to spend it.
+//
+// A card that has been answered must stop being a form. Left live it collects
+// an empty input and a working button under every question in the history, and
+// the learner can answer the same question twice -- which the assessor would
+// grade as two separate attempts at a question it only asked once.
+//
+// Retiring leaves the question and its rung on screen. That history is the
+// point: the answer appears underneath as the learner's own message, and the
+// pair reads as a record of the exchange.
+func renderQuestionCard(v ext.ViewSpec, emit func(ext.ViewEvent)) (fyne.CanvasObject, func()) {
 	var p ext.QuestionProps
 	_ = v.DecodeProps(&p)
 	pal := currentPalette()
@@ -180,26 +195,42 @@ func renderQuestion(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject 
 		}
 	}
 
+	// The button sits in an HBox so it keeps its own width. A VBox stretches its
+	// children, and a full-width slab of accent colour under every question
+	// shouts louder than the question does.
+	buttons := container.NewHBox()
+	box := container.NewVBox(header, prompt, control, buttons)
+
+	spent := false
+	retire := func() {
+		if spent {
+			return
+		}
+		spent = true
+		box.Objects = []fyne.CanvasObject{header, prompt}
+		box.Refresh()
+	}
+
 	send := widget.NewButton("Answer", func() {
 		if emit == nil {
 			return
 		}
-		if answer := strings.TrimSpace(read()); answer != "" {
-			emit(answerEvent(v.ID, answer))
+		answer := strings.TrimSpace(read())
+		if answer == "" {
+			return
 		}
+		retire()
+		emit(answerEvent(v.ID, answer))
 	})
 	send.Importance = widget.HighImportance
+	buttons.Add(send)
 
 	// L2 is the rung that does the teaching, so it is marked differently.
 	bar := pal.success
 	if strings.EqualFold(p.Level, "L2") {
 		bar = pal.accent
 	}
-	// The button sits in an HBox so it keeps its own width. A VBox stretches
-	// its children, and a full-width slab of accent colour under every question
-	// shouts louder than the question does.
-	return accented(pal.surface, bar, 8,
-		container.NewVBox(header, prompt, control, container.NewHBox(send)))
+	return accented(pal.surface, bar, 8, box), retire
 }
 
 func answerEvent(nodeID, answer string) ext.ViewEvent {

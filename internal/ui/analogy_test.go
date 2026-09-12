@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 
@@ -146,4 +147,108 @@ func keysOf(m map[string]*widget.Button) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+func aQuestion(id, level string) ext.ViewSpec {
+	return ext.View(ext.ViewQuestion, id, ext.QuestionProps{Level: level, Prompt: "what plays that role?"})
+}
+
+func entries(obj fyne.CanvasObject) int {
+	n := 0
+	walk(obj, func(o fyne.CanvasObject) {
+		switch o.(type) {
+		case *widget.Entry, *widget.RadioGroup:
+			n++
+		}
+	})
+	return n
+}
+
+// TestAnAnsweredQuestionStopsBeingAForm: a card left live collects an empty
+// input under every question in the history, and can be answered a second time
+// — which the assessor would grade as a second attempt at a question it asked
+// once.
+func TestAnAnsweredQuestionStopsBeingAForm(t *testing.T) {
+	test.NewApp()
+	var got []ext.ViewEvent
+	card, _ := renderQuestionCard(aQuestion("q1", "L2"), func(ev ext.ViewEvent) { got = append(got, ev) })
+
+	answer := buttons(card)["Answer"]
+	if answer == nil {
+		t.Fatal("no Answer button on a fresh question")
+	}
+	if entries(card) != 1 {
+		t.Fatal("a fresh question has no input")
+	}
+
+	// Fyne's Entry cannot be typed into headlessly, so drive the control the
+	// way the button does and check the card is spent either way.
+	walk(card, func(o fyne.CanvasObject) {
+		if e, ok := o.(*widget.Entry); ok {
+			e.SetText("the replicated log")
+		}
+	})
+	answer.OnTapped()
+
+	if len(got) != 1 || got[0].NodeID != "q1" {
+		t.Fatalf("the answer did not reach the host: %v", got)
+	}
+	if entries(card) != 0 {
+		t.Error("the input is still there after answering")
+	}
+	if b := buttons(card); len(b) != 0 {
+		t.Errorf("the card can still be answered again: %v", keysOf(b))
+	}
+	if !strings.Contains(allText(card), "what plays that role?") {
+		t.Error("the question itself was removed; the history should keep what was asked")
+	}
+	if !strings.Contains(allText(card), "L2") {
+		t.Error("the rung was removed from the record")
+	}
+}
+
+// An empty answer must not spend the card.
+func TestAnEmptyAnswerLeavesTheCardOpen(t *testing.T) {
+	test.NewApp()
+	var got []ext.ViewEvent
+	card, _ := renderQuestionCard(aQuestion("q1", "L1"), func(ev ext.ViewEvent) { got = append(got, ev) })
+
+	buttons(card)["Answer"].OnTapped()
+	if len(got) != 0 {
+		t.Error("an empty answer was submitted")
+	}
+	if entries(card) != 1 {
+		t.Error("an empty answer retired the card")
+	}
+}
+
+// TestANewQuestionRetiresTheLast: the assessor parks one question at a time, so
+// at most one card on screen can be answerable.
+//
+// The shell is assembled by hand rather than through New, which builds a real
+// window and blocks without a driver to run it.
+func TestANewQuestionRetiresTheLast(t *testing.T) {
+	test.NewApp()
+	feed := container.NewVBox()
+	s := &Shell{feed: feed, scroll: container.NewVScroll(feed), streaming: &strings.Builder{}, streamAt: -1}
+
+	s.AppendView(aQuestion("q1", "L1"))
+	s.AppendView(aQuestion("q2", "L2"))
+	if open := openCards(feed); open != 1 {
+		t.Errorf("%d answerable cards after a second question arrived, want 1", open)
+	}
+
+	// Answering in the message box below retires whatever is still open.
+	s.retireQuestions()
+	if open := openCards(feed); open != 0 {
+		t.Errorf("%d answerable cards after the learner answered elsewhere, want 0", open)
+	}
+}
+
+func openCards(feed *fyne.Container) int {
+	n := 0
+	for _, obj := range feed.Objects {
+		n += entries(obj)
+	}
+	return n
 }
