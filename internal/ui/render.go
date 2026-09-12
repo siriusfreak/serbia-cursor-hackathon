@@ -34,6 +34,8 @@ func Render(v ext.ViewSpec, emit func(ext.ViewEvent)) fyne.CanvasObject {
 		return renderMastery(v)
 	case ext.ViewImage:
 		return renderImage(v)
+	case ext.ViewFinding:
+		return renderFinding(v)
 	default:
 		return muted(fmt.Sprintf("[unsupported view %q — update the app]", v.Type))
 	}
@@ -122,6 +124,46 @@ func analogyRow(pal palette, r ext.AnalogyRow, emit func(ext.ViewEvent)) fyne.Ca
 	}
 
 	return accented(pal.surface, pal.accent, 8, container.NewVBox(lines...))
+}
+
+// renderFinding draws the review card.
+//
+// Everything about it is deliberately unlike the analogy table beside it: a
+// red edge where that one is amber, and a REVIEW header where that one says
+// ANALOGY. A session does both, and the learner has to tell at a glance which
+// cards are things they now hold and which are open questions about code.
+func renderFinding(v ext.ViewSpec) fyne.CanvasObject {
+	var p ext.FindingProps
+	_ = v.DecodeProps(&p)
+	pal := currentPalette()
+
+	lines := []fyne.CanvasObject{sectionLabel("REVIEW · CLAIM vs TESTS")}
+	if head := strings.TrimSpace(p.Subject + "  " + p.Title); head != "" {
+		lines = append(lines, styledText(head,
+			theme.ColorNameForeground, theme.SizeNameText, fyne.TextStyle{Bold: true}))
+	}
+	if p.Claim != "" {
+		lines = append(lines, muted("the author promises"), body(p.Claim))
+	}
+	if p.Observed != "" {
+		lines = append(lines, muted("what the tests in this change actually check"))
+		lines = append(lines, styledText(p.Observed,
+			theme.ColorNameWarning, theme.SizeNameText, fyne.TextStyle{}))
+	}
+	if p.Untested != "" {
+		lines = append(lines, styledText("✗  nobody runs  "+p.Untested,
+			theme.ColorNameError, theme.SizeNameText, fyne.TextStyle{Bold: true}))
+	}
+	for _, c := range p.Citations {
+		if c.Quote == "" {
+			continue
+		}
+		lines = append(lines, muted(c.Path+"  ·  "+c.Quote))
+	}
+	if p.URL != "" {
+		lines = append(lines, muted(p.URL))
+	}
+	return accented(pal.surface, pal.danger, 8, container.NewVBox(lines...))
 }
 
 // analogyDoors are the two ways out of a pair and into more learning.

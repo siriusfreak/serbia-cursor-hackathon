@@ -68,6 +68,9 @@ type Shell struct {
 	streamAt  int // index of the streaming widget in feed, -1 when idle
 	// shownAnalogies counts rows already drawn, so a turn renders only new ones.
 	shownAnalogies int
+	// drewFinding is set when oracle_check already painted a REVIEW card this
+	// turn, so drawNewAnalogies does not redraw the same gap as an ANALOGY.
+	drewFinding bool
 	// cyrillic is set once the learner writes in Cyrillic. See phrase.
 	cyrillic bool
 	// liveQuestions retires question cards that are still forms. A learner who
@@ -84,6 +87,12 @@ func New(ctx context.Context, cfg Config) *Shell {
 		cfg.Title = "cogdebt"
 	}
 	s := &Shell{cfg: cfg, ctx: ctx, streaming: &strings.Builder{}, streamAt: -1}
+	// Start from what is already stored, not from zero. Leaving this at zero
+	// makes the first turn against an existing cogdebt.db dump every analogy
+	// the learner has ever recorded into the feed as if it had just happened.
+	if cfg.Analogies != nil {
+		s.shownAnalogies = len(cfg.Analogies(ctx))
+	}
 
 	s.app = fyneapp.New()
 	s.app.Settings().SetTheme(newTheme())
@@ -203,6 +212,7 @@ func (s *Shell) submit() {
 
 	s.streaming.Reset()
 	s.streamAt = -1
+	s.drewFinding = false
 
 	s.cfg.Bridge.Send(s.ctx, text, Handler{
 		OnText:       s.streamText,
@@ -285,6 +295,32 @@ func (s *Shell) appendToolResult(name string, result map[string]any) {
 		// net, so the same table arrives twice; the store is the one place that
 		// has already collapsed them.
 		s.drawAnalogies()
+
+	case strings.HasSuffix(name, "oracle_check"):
+		var f struct {
+			URL       string         `json:"url"`
+			Subject   string         `json:"subject"`
+			Title     string         `json:"title"`
+			Claim     string         `json:"claim"`
+			Observed  string         `json:"observed"`
+			Citations []ext.Citation `json:"citations"`
+			Untested  struct {
+				Shape string `json:"shape"`
+			} `json:"untested"`
+		}
+		if json.Unmarshal(raw, &f) != nil || f.Observed == "" {
+			return
+		}
+		s.drewFinding = true
+		s.AppendView(ext.View(ext.ViewFinding, "", ext.FindingProps{
+			Subject:   f.Subject,
+			Title:     f.Title,
+			Claim:     f.Claim,
+			Observed:  f.Observed,
+			Untested:  f.Untested.Shape,
+			Citations: f.Citations,
+			URL:       f.URL,
+		}))
 
 	case strings.HasSuffix(name, "fal_illustrate"):
 		var img struct {
@@ -428,7 +464,27 @@ func (s *Shell) drawAnalogies() {
 	}
 	fresh := rows[:len(rows)-s.shownAnalogies] // newest first
 	s.shownAnalogies = len(rows)
-	s.AppendView(ext.View(ext.ViewAnalogyTable, "", ext.AnalogyTableProps{Rows: fresh}))
+
+	var skills, review []ext.AnalogyRow
+	for _, r := range fresh {
+		if r.SharedRole == "same promise" {
+			review = append(review, r)
+			continue
+		}
+		skills = append(skills, r)
+	}
+	if !s.drewFinding {
+		for _, r := range review {
+			s.AppendView(ext.View(ext.ViewFinding, "", ext.FindingProps{
+				Subject:  r.Target,
+				Observed: r.Breakdown,
+				Untested: r.Target,
+			}))
+		}
+	}
+	if len(skills) > 0 {
+		s.AppendView(ext.View(ext.ViewAnalogyTable, "", ext.AnalogyTableProps{Rows: skills}))
+	}
 }
 
 func (s *Shell) refreshMastery() {

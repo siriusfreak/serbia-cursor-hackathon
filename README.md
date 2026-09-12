@@ -81,7 +81,7 @@ internal/domain/  concepts, mastery, analogies, debt — no external deps
 internal/store/   SQLite (modernc, cgo-free) + namespaced KV for plugins
 internal/ui/      theme, components, renderer, bridge to the runner
 exts/             plugins: profile, assessor, analogy (agent), github, exa,
-                  firecrawl, fal, daytona
+                  firecrawl, fal, daytona, vcs, oracle, review (agent)
 cmd/ext-github/   the same github plugin, as a standalone process
 e2e/              scenarios: a simulated learner works through a field
 docs/             PLUGIN_GUIDE.md

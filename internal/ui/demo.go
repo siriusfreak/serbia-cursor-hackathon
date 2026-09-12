@@ -52,6 +52,31 @@ func (s *Shell) Seed() {
 		Prompt: "You said a model registry is etcd for models. Where does that analogy stop working?",
 	}))
 
+	s.appendUser("https://github.com/example/engine/pull/42")
+	s.appendToolCall("review")
+	s.appendToolCall("oracle_check")
+	s.AppendView(ext.View(ext.ViewFinding, "", ext.FindingProps{
+		Subject:  "example/engine#42",
+		Title:    "Honour the cache flag on UserRepository and OrderRepository",
+		Claim:    "UserRepository and OrderRepository now honour enable_cache the same way.",
+		Observed: "The change promises the same thing for UserRepository and OrderRepository, but only UserRepository is checked with enable_cache set both ways.",
+		Untested: "the same check on OrderRepository with enable_cache flipped the other way",
+		Citations: []ext.Citation{{
+			Path:  "repo_test.go",
+			Quote: "func TestOrderRepository(t *testing.T) {",
+		}},
+		URL: "https://github.com/example/engine/pull/42",
+	}))
+	s.AppendView(ext.View(ext.ViewQuestion, "q2", ext.QuestionProps{
+		Level:  "L2",
+		Prompt: "The author said both repositories honour the flag. What do you actually run?",
+		Options: []string{
+			"Call OrderRepository with enable_cache on and off",
+			"Re-read the diff and approve",
+			"Trust the test because it mentions OrderRepository",
+		},
+	}))
+
 	// A preview reads better from the top; live use stays pinned to the newest.
 	s.scroll.ScrollToTop()
 

@@ -416,7 +416,8 @@ internal/ui/      theme.go, components.go (visual vocabulary), render.go
                   shell.go, demo.go (seeding + screenshot)
 internal/ext/subprocess/  out-of-process transport (go-plugin over net/rpc)
 exts/             plugins: profile and assessor (host state, in-process),
-                  analogy (declarative agent), github (portable, HTTP only)
+                  analogy and review (declarative agents), github and vcs
+                  (portable, HTTP), oracle (claim vs tests)
 cmd/ext-github/   github as a standalone plugin process
 e2e/              scenarios: a simulated learner works through a field
                   against the real model and the real plugins
@@ -438,8 +439,9 @@ docs/             PLUGIN_GUIDE.md — written for plugin authors
   to load with a clear message instead of misbehaving.
 - **Prompt changes**: the root instruction is `app.RootInstruction` in
   `internal/app/app.go`; the
-  analogy strategy is `structureMappingInstruction` in `exts/analogy`. Both
-  must keep the "reply in the learner's language" rule.
+  analogy strategy is `structureMappingInstruction` in `exts/analogy`; the
+  review strategy is `instruction` in `exts/review`. All three must keep the
+  "reply in the learner's language" rule.
 - **Verify before reporting.** Build, vet, test, and for anything user-visible
   run `-cli` against the real model or `-screenshot` for the UI. This project
   has repeatedly had defects that compile and test clean and only appear in a
@@ -455,7 +457,7 @@ Two things about the ladder worth knowing before changing it:
 
 - **The UI draws cards from tool results, not from prose.** `ui.Bridge` surfaces
   `FunctionResponse` parts, and `Shell.appendToolResult` maps the ones it knows
-  (`assessor_ask`, `profile_save_analogy`) onto ViewSpecs. Adding a new card
+  (`assessor_ask`, `profile_save_analogy`, `oracle_check`) onto ViewSpecs. Adding a new card
   means adding a case there, not asking the model to emit JSON in its text.
 - **The producer records.** The analogy agent calls `profile_save_analogy`
   itself rather than leaving it to its caller. A caller asked to record someone
