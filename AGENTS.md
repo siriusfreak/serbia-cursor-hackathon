@@ -201,6 +201,42 @@ detour cost an afternoon:
 Port 2280 and the header were established by probing, not from documentation.
 If code execution starts returning 401, re-probe before assuming the key is bad.
 
+## The pitch deck is part of the product — update it with the code
+
+`presentation/` is the hackathon deck, served by Render from `master`. It is not
+a side artifact: it is the version of this project that other people actually
+see, and a deck that has drifted from the code is worse than no deck, because it
+is confidently wrong in front of an audience.
+
+**When you change any of the following, change the deck in the same commit:**
+
+| you changed | update |
+|---|---|
+| the palette in `internal/ui/theme.go` | the `:root` block in `presentation/index.html` |
+| the plugin set in `exts/` | the ABI table and the plugin count on the architecture slide |
+| `ext.Extension` | the "3 methods" claim and the code block on the ABI slide |
+| the debt formula or the L1–L4 ladder | the formula slide and the ladder slide |
+| the UI, visibly | re-shoot `presentation/assets/app.png` with `-screenshot` |
+| any slide | the matching `## N · ` section in `presentation/SPEECH.md` |
+
+`design/deck_test.go` enforces most of this and fails `go test ./...` when it
+drifts: every colour in the deck must be in the app palette, the plugin table
+must match `exts/` exactly in both directions, the ABI method count must match
+`abi.go`, every slide must carry `<aside class="notes">`, and `SPEECH.md` must
+have one numbered section per slide. It cannot check whether a sentence is still
+*true* — that part is yours.
+
+Two rules the test cannot express. Numbers on slides are measured, never
+estimated: the 120s→34s figures came out of the tracing, so if you re-measure,
+change them. And the deck claims six of the ten partner technologies with a
+concrete job each — if a plugin stops being used, move it to the "not used" line
+rather than leaving the claim standing.
+
+The deck is plain static HTML with no build step and no dependencies: open
+`presentation/index.html` in a browser. Arrow keys navigate, `N` shows the
+speaker notes, `F` is fullscreen, and printing gives a PDF backup for when the
+projector loses the laptop.
+
 ## Layout
 
 ```
@@ -218,6 +254,8 @@ internal/ext/subprocess/  out-of-process transport (go-plugin over net/rpc)
 exts/             plugins: profile and assessor (host state, in-process),
                   analogy (declarative agent), github (portable, HTTP only)
 cmd/ext-github/   github as a standalone plugin process
+presentation/     the hackathon deck (static HTML, no build) + SPEECH.md;
+                  deployed to Render from master, checked by design/deck_test.go
 docs/             PLUGIN_GUIDE.md — written for plugin authors
 ```
 
